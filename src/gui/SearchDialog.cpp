@@ -822,11 +822,18 @@ void SearchDialog::greekLetterClicked()
 
 void SearchDialog::gotoObject()
 {
+    qDebug() << "gotoObject() Entered";
+    qDebug() << "ui:" << ui;
+    qDebug() << "ui->completeLabel:" << ui->completionLabel;
+    qDebug() << "ui->completeLabel->getSelected():" << ui->completionLabel->getSelected();
+    qDebug() << "calling gotoObject(...): " << ui->completionLabel->getSelected();
 	gotoObject(ui->completionLabel->getSelected());
+    qDebug() << "gotoObject() exit";
 }
 
 void SearchDialog::gotoObject(const QString &nameI18n)
 {
+    qDebug() << "gotoObject(&nameI18n) Entered";
 	if (nameI18n.isEmpty())
 		return;
 
@@ -894,13 +901,20 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 				GETSTELMODULE(StelObjectMgr)->unSelect();
 			}
 		}
-	}
+    }
+
+    qDebug() << "(gotoObject) simbadResults: " << simbadResults;
+    qDebug() << "(gotoObject) objectMgr: " << objectMgr;
+
 	simbadResults.clear();
+    qDebug() << "gotoObject(&nameI18n) Exit";
 }
 
 void SearchDialog::gotoObject(const QModelIndex &modelIndex)
 {
+    qDebug() << "gotoObject(&modelIndex) Entered";
 	gotoObject(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
+    qDebug() << "gotoObject(&modelIndex) Exit";
 }
 
 void SearchDialog::searchListClear()
