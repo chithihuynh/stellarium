@@ -53,9 +53,25 @@
 
 #include "SimbadSearcher.hpp"
 
+
+// Testing struct info for recent search
+recentObjectSearchStruct recentObjectSearch;
+QStringList rsl = recentObjectSearch.recentSearchList;
+
+
 // Start of members for class CompletionLabel
 CompletionLabel::CompletionLabel(QWidget* parent) : QLabel(parent), selectedIdx(0)
 {
+    rsl << "Orian" << "Polaris";
+
+//    QStringList rsl = recentObjectSearch.recentSearchList;
+    if (rsl.isEmpty())
+            qDebug() << ".....Empty";
+    else
+        for(int i = 0; i < rsl.size(); i++){
+            qDebug() << "recentSearchList:" << rsl[i];
+        }
+
 }
 
 CompletionLabel::~CompletionLabel()
@@ -64,14 +80,22 @@ CompletionLabel::~CompletionLabel()
 
 void CompletionLabel::setValues(const QStringList& v)
 {
+//    qDebug() << recentSearchObject
 	values=v;
-	updateText();
+    updateText();
 }
 
 void CompletionLabel::appendValues(const QStringList& v)
 {
 	values+=v;
 	updateText();
+}
+
+
+void CompletionLabel::appendRecentValues(QStringList& v)
+{
+    values+=v;
+    updateText();
 }
 
 void CompletionLabel::clearValues()
@@ -112,23 +136,31 @@ void CompletionLabel::selectFirst()
 
 void CompletionLabel::updateText()
 {
-	QString newText;
+    QString newText;
 
-	// Regenerate the list with the selected item in bold
-	for (int i=0;i<values.size();++i)
-	{
+// Regenerate the list with the selected item in bold
+    for (int i=0;i<values.size();i++)
+    {
+
+        QString word = values[i];
+        qDebug() << word;
+        // Initalize recent searches
+        if(rsl.contains(word))
+            word = "<i>" + word + "</i>";
+
 		if (i==selectedIdx)
-			newText+="<b>"+values[i]+"</b>";
+            newText+="<b>"+word+"</b>";
 		else
-			newText+=values[i];
+
+            newText+=word;
 		if (i!=values.size()-1)
 			newText += ", ";
+
 	}
 	setText(newText);
 }
 
 // Start of members for class SearchDialog
-
 const char* SearchDialog::DEF_SIMBAD_URL = "https://simbad.u-strasbg.fr/";
 SearchDialog::SearchDialogStaticData SearchDialog::staticData;
 QString SearchDialog::extSearchText = "";
@@ -371,7 +403,7 @@ void SearchDialog::createDialogContent()
 	connect(ui->thetaPushButton, SIGNAL(clicked(bool)), this, SLOT(greekLetterClicked()));
 	connect(ui->iotaPushButton, SIGNAL(clicked(bool)), this, SLOT(greekLetterClicked()));
 	connect(ui->kappaPushButton, SIGNAL(clicked(bool)), this, SLOT(greekLetterClicked()));
-	connect(ui->lambdaPushButton, SIGNAL(clicked(bool)), this, SLOT(greekLetterClicked()));
+    connect(ui->lambdaPushButton, SIGNAL(clicked(bool)), this, SLOT(greekLetterClicked()));
 	connect(ui->muPushButton, SIGNAL(clicked(bool)), this, SLOT(greekLetterClicked()));
 	connect(ui->nuPushButton, SIGNAL(clicked(bool)), this, SLOT(greekLetterClicked()));
 	connect(ui->xiPushButton, SIGNAL(clicked(bool)), this, SLOT(greekLetterClicked()));
@@ -680,15 +712,20 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		simbadResults.clear();
 	}
 
+
 	QString trimmedText = text.trimmed().toLower();
+    // Empty search
 	if (trimmedText.isEmpty()) {
 		ui->completionLabel->clearValues();
 		ui->completionLabel->selectFirst();
 		ui->simbadStatusLabel->setText("");
 		ui->simbadCooStatusLabel->setText("");
-		ui->pushButtonGotoSearchSkyObject->setEnabled(false);
-	} else {
-		if (useSimbad)
+        ui->pushButtonGotoSearchSkyObject->setEnabled(false);
+
+        // TODO: Load recent search if string is empty (MAYBE) - have to enable: ui->pushButtonGotoSearchSkyObject->setEnabled(true);?
+
+    } else {
+        if (useSimbad)
 		{
 			simbadReply = simbadSearcher->lookup(simbadServerUrl, trimmedText, 4);
 			onSimbadStatusChanged();
@@ -696,36 +733,157 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		}
 
 		QString greekText = substituteGreek(trimmedText);
-		QStringList matches;
+
+        // Get possible recent object search
+        QStringList recentMatches;
+        QStringList matches;
 		if(greekText != trimmedText)
 		{
-			matches  = objectMgr->listMatchingObjects(trimmedText, 8, useStartOfWords, false);
-			matches += objectMgr->listMatchingObjects(trimmedText, 8, useStartOfWords, true);
-			matches += objectMgr->listMatchingObjects(greekText, (18 - matches.size()), useStartOfWords, false);
-			matches += objectMgr->listMatchingObjects(greekText, (18 - matches.size()), useStartOfWords, true);
+
+            int trimmedTextMaxNbItem = 8;
+            int greekTextMaxMbItem = 18;
+
+            recentMatches = listMatchingRecentObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords);
+            recentMatches += listMatchingRecentObjects(greekText, (greekTextMaxMbItem - matches.size()), useStartOfWords);
+            // TODO: DEBUG: Am I over calculating?
+            // Update max size
+            trimmedTextMaxNbItem -= recentMatches.size();
+            greekTextMaxMbItem -= recentMatches.size();
+
+            matches  = objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, false);
+            matches += objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, true);
+            matches += objectMgr->listMatchingObjects(greekText, (greekTextMaxMbItem - matches.size()), useStartOfWords, false);
+            matches += objectMgr->listMatchingObjects(greekText, (greekTextMaxMbItem - matches.size()), useStartOfWords, true);
+            // Maybe at recent search match here
 		}
 		else
 		{
-			matches  = objectMgr->listMatchingObjects(trimmedText, 13, useStartOfWords, false);
-			matches += objectMgr->listMatchingObjects(trimmedText, 13, useStartOfWords, true);
-		}
+            int trimmedTextMaxNbItem = 13;
 
+            recentMatches = listMatchingRecentObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords);
+
+
+            // TODO: DEBUG: Am I over calculating?
+            // Update max size
+            trimmedTextMaxNbItem -= recentMatches.size();
+
+            matches  = objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, false);
+            matches += objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, true);
+            // Maybe add recentSearch match here
+		}
 		// remove possible duplicates from completion list
 		matches.removeDuplicates();
+        matches.sort(Qt::CaseInsensitive);
 
-		matches.sort(Qt::CaseInsensitive);
+        // Actually, add recent search here after sort and then remove Duplicates
+
 		// objects with short names should be searched first
 		// examples: Moon, Hydra (moon); Jupiter, Ghost of Jupiter
 		stringLengthCompare comparator;
 		std::sort(matches.begin(), matches.end(), comparator);
 
-		ui->completionLabel->setValues(matches);
+        // Upate recent matches with "values"
+        ui->completionLabel->appendRecentValues(recentMatches);
+
+        // Append both list (with recent first)
+        recentMatches << matches;
+        recentMatches.removeDuplicates();
+
+//        qDebug() << "Size after remove of dup:" << recentMatches.size();
+
+        ui->completionLabel->setValues(recentMatches);
 		ui->completionLabel->selectFirst();
 
 		// Update push button enabled state
 		ui->pushButtonGotoSearchSkyObject->setEnabled(true);
 	}
+
 }
+
+
+void SearchDialog::updateRecentSearchList()
+{
+    updateRecentSearchList(ui->completionLabel->getSelected());}
+void SearchDialog::updateRecentSearchList(const QString &nameI18n)
+{
+    if(nameI18n.isEmpty())
+        return;
+
+
+
+    QString objectWord = nameI18n;
+
+        qDebug() << "name:" << nameI18n << "|" << objectWord;
+    // Remove dup search and prepend to beginning
+    if( rsl.contains(objectWord) )
+    {
+        rsl.removeOne(objectWord);
+        rsl.prepend(objectWord);
+        qDebug() << "u con: move: " << rsl;
+    }
+    else
+    {
+        rsl.prepend(objectWord);
+        recentObjectSearch.searchListIndex++;
+
+        // Remove oldest search if greater than list size
+        if( rsl.size() > recentObjectSearch.maxRecentListSize)
+        {
+            if(!rsl.isEmpty())
+            {
+                rsl.removeLast(); // Probably not going to happen
+                recentObjectSearch.searchListIndex--;
+            }
+
+        }
+
+    }
+
+
+}
+
+void SearchDialog::updateRecentSearchList(const QModelIndex &modelIndex)
+{
+    updateRecentSearchList(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
+}
+void SearchDialog::loadRecentSearchList()
+{
+    // TODO: recent search list
+}
+
+QStringList SearchDialog::listMatchingRecentObjects(const QString& objPrefix, int maxNbItem, bool useStartOfWords) const
+{
+    QStringList result;
+
+    if(maxNbItem <= 0)
+    {
+        return result;
+    }
+
+    QString word;
+    // For all recent objects - prepend to recent list
+    for (int i = 0; i < rsl.size(); i++)
+    {
+
+        // Match with beginning of word
+        if(useStartOfWords && rsl[i].startsWith(objPrefix, Qt::CaseInsensitive))
+        {
+            result.prepend(rsl[i]);
+            maxNbItem--;
+            continue;
+        }
+
+       // Match search anywhere in word
+        if(!useStartOfWords && rsl[i].contains(objPrefix, Qt::CaseInsensitive))
+        {
+            result.prepend(rsl[i]);
+            maxNbItem--;
+
+        }
+    }
+    return result;
+}
+
 
 void SearchDialog::lookupCoordinates()
 {
@@ -746,8 +904,7 @@ void SearchDialog::lookupCoordinates()
 	connect(simbadReply, SIGNAL(statusChanged()), this, SLOT(onSimbadStatusChanged()));
 }
 
-void SearchDialog::clearSimbadText(StelModule::StelModuleSelectAction)
-{
+void SearchDialog::clearSimbadText(StelModule::StelModuleSelectAction){
 	ui->simbadCooResultsTextBrowser->clear();
 }
 
@@ -773,18 +930,17 @@ void SearchDialog::onSimbadStatusChanged()
 		info = QString("%1: %2").arg(q_("Simbad Lookup")).arg(simbadReply->getCurrentStatusString());
 		if (index==1)
 			ui->simbadCooStatusLabel->setText(info);
-		else
+        else
 			ui->simbadStatusLabel->setText(info);
 		// Query not over, don't disable button
 		ui->pushButtonGotoSearchSkyObject->setEnabled(true);
 	}
-
-	if (simbadReply->getCurrentStatus()==SimbadLookupReply::SimbadLookupFinished)
+    if (simbadReply->getCurrentStatus()==SimbadLookupReply::SimbadLookupFinished)
 	{
 		simbadResults = simbadReply->getResults();
-		ui->completionLabel->appendValues(simbadResults.keys());
+        ui->completionLabel->appendValues(simbadResults.keys());
 		// Update push button enabled state
-		ui->pushButtonGotoSearchSkyObject->setEnabled(!ui->completionLabel->isEmpty());
+        ui->pushButtonGotoSearchSkyObject->setEnabled(!ui->completionLabel->isEmpty());
 	}
 
 	if (simbadReply->getCurrentStatus()==SimbadLookupReply::SimbadCoordinateLookupFinished)
@@ -833,9 +989,13 @@ void SearchDialog::gotoObject()
 
 void SearchDialog::gotoObject(const QString &nameI18n)
 {
-    qDebug() << "gotoObject(&nameI18n) Entered";
+    qDebug() << "gotoObject(&nameI18n) Entered:" << nameI18n;
 	if (nameI18n.isEmpty())
 		return;
+
+    // Update recent search list
+    updateRecentSearchList();
+
 
 	StelMovementMgr* mvmgr = GETSTELMODULE(StelMovementMgr);
 	if (simbadResults.contains(nameI18n))
@@ -906,7 +1066,7 @@ void SearchDialog::gotoObject(const QString &nameI18n)
     qDebug() << "(gotoObject) simbadResults: " << simbadResults;
     qDebug() << "(gotoObject) objectMgr: " << objectMgr;
 
-	simbadResults.clear();
+    simbadResults.clear();
     qDebug() << "gotoObject(&nameI18n) Exit";
 }
 

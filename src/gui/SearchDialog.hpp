@@ -40,6 +40,15 @@ struct stringLengthCompare
 	}
 };
 
+
+struct recentObjectSearchStruct
+{
+    int searchListIndex = 0;
+    int maxRecentListSize = 10;
+    QStringList recentSearchList;
+};
+Q_DECLARE_METATYPE(recentObjectSearchStruct)
+
 //! @class CompletionLabel
 //! Display a list of results matching the search string, and allow to
 //! tab through those selections.
@@ -55,7 +64,10 @@ public:
 	void setValues(const QStringList&);
 	bool isEmpty() const {return values.isEmpty();}
 	void appendValues(const QStringList&);
+    void appendRecentValues(QStringList& v);
 	void clearValues();
+
+
 	
 public slots:
 	void selectNext();
@@ -171,6 +183,14 @@ private slots:
 	void gotoObject(const QModelIndex &modelIndex);
 
 	void searchListClear();
+
+    // RECENT OBJECT SEARCHES #TODO: Should this be in the "private slots" or just "private"?
+    QStringList listMatchingRecentObjects(const QString& objPrefix, int maxNbItem=5, bool useStartOfWords=false) const;
+    void updateRecentSearchList();
+    void updateRecentSearchList(const QString &nameI18n);
+    void updateRecentSearchList(const QModelIndex &modelIndex);
+    void loadRecentSearchList();
+    // TODO: How to generate "data/recentObjectSearch.json" during install
 	
 	//! Called when the user edit the manual position controls
 	void manualPositionChanged();
@@ -197,7 +217,7 @@ private slots:
 	//! Called when new type of objects selected in list view tab
 	void updateListView(int index);
 
-	// retranslate/recreate tab
+    // retranslate/recreate tab
 	void updateListTab();
 
 	void showContextMenu(const QPoint &pt);
@@ -221,6 +241,8 @@ private slots:
 	void setSimbadGetsMorpho(bool b);
 	void setSimbadGetsTypes(bool b);
 	void setSimbadGetsDims(bool b);
+
+
 
 private:
 	class SearchDialogStaticData
