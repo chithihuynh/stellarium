@@ -1070,7 +1070,7 @@ void SearchDialog::gotoObject(const QString &nameI18n)
     qDebug() << "gotoObject(&nameI18n) Exit";
 }
 
-void SearchDialog::gotoObject(const QModelIndex &modelIndex)
+void SearchDialog::gotoObject(const QModelIndex &modelIndex):::
 {
     qDebug() << "gotoObject(&modelIndex) Entered";
 	gotoObject(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
