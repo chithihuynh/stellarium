@@ -181,7 +181,18 @@ SearchDialog::SearchDialog(QObject* parent)
 
     // Recent object search init
     recentObjectSearchesData.maxSize = 10;
-    recentObjectSearchesJsonPath = StelFileMgr::findFile("data", (StelFileMgr::Flags)(StelFileMgr::Directory | StelFileMgr::Writable)) + "/recentObjectSearches.json";
+    try
+    {
+        recentObjectSearchesJsonPath = StelFileMgr::findFile("data",
+                                                             (StelFileMgr::Flags)
+                                                             (StelFileMgr::Directory |
+                                                              StelFileMgr::Writable)) + "/recentObjectSearches.json";
+    }
+    catch (std::runtime_error& e)
+    {
+        qWarning() << "[Search] Could not locate file: data/recentObjectSearches.json : " << e.what();
+    }
+
 }
 
 SearchDialog::~SearchDialog()
@@ -728,16 +739,11 @@ void SearchDialog::onSearchTextChanged(const QString& text)
         QStringList matches;
 		if(greekText != trimmedText)
 		{
-
             int trimmedTextMaxNbItem = 8;
             int greekTextMaxMbItem = 18;
 
             recentMatches = listMatchingRecentObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords);
-            recentMatches += listMatchingRecentObjects(greekText, (greekTextMaxMbItem - matches.size()), useStartOfWords);
-            // TODO: DEBUG: Am I over calculating?
-            // Update max size
-            trimmedTextMaxNbItem -= recentMatches.size();
-            greekTextMaxMbItem -= recentMatches.size();
+            recentMatches += listMatchingRecentObjects(greekText, (greekTextMaxMbItem - recentMatches.size()), useStartOfWords);
 
             matches  = objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, false);
             matches += objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, true);
@@ -749,10 +755,6 @@ void SearchDialog::onSearchTextChanged(const QString& text)
             int trimmedTextMaxNbItem = 13;
 
             recentMatches = listMatchingRecentObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords);
-
-            // TODO: DEBUG: Am I over calculating?
-            // Update max size
-            trimmedTextMaxNbItem -= recentMatches.size();
 
             matches  = objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, false);
             matches += objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, true);
@@ -775,6 +777,7 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 
         // Upate recent matches with "values"
         ui->completionLabel->appendValues(allMatches);
+        ui->completionLabel->appendRecentValues(recentMatches);
 
         ui->completionLabel->setValues(allMatches);
 		ui->completionLabel->selectFirst();
@@ -796,27 +799,27 @@ void SearchDialog::updateRecentSearchList(const QString &nameI18n)
         return;
 
     QString objectWord = nameI18n;      
-    // Remove dup search and prepend to beginning
-    if(recentObjectSearchesData.recentSearchList.contains(objectWord) )
+    // Remove dup search
+    if(recentObjectSearchesData.recentSearchList.contains(objectWord))
     {
         recentObjectSearchesData.recentSearchList.removeOne(objectWord);
-        recentObjectSearchesData.recentSearchList.prepend(objectWord);
+//        recentObjectSearchesData.recentSearchList.prepend(objectWord);
     }
-    else
-    {
-        recentObjectSearchesData.recentSearchList.prepend(objectWord);
 
-        // Remove oldest search if greater than max list size
-        if( recentObjectSearchesData.recentSearchList.size() > recentObjectSearchesData.maxSize)
+    // Prepend to list
+    recentObjectSearchesData.recentSearchList.prepend(objectWord);
+
+    // Remove oldest search if greater than max list size
+    if( recentObjectSearchesData.recentSearchList.size() > recentObjectSearchesData.maxSize)
+    {
+        // Make sure list is not empty - REMOVE? Probably not going to happen
+        if(!recentObjectSearchesData.recentSearchList.isEmpty())
         {
-            // Make sure list is not empty - REMOVE? Probably not going to happen
-            if(!recentObjectSearchesData.recentSearchList.isEmpty())
-                recentObjectSearchesData.recentSearchList.removeLast();
+            recentObjectSearchesData.recentSearchList.removeLast();
         }
     }
-
     // Update CompletionLabel's recent values
-    ui->completionLabel->appendRecentValues(recentObjectSearchesData.recentSearchList);
+//    ui->completionLabel->appendRecentValues(recentObjectSearchesData.recentSearchList); // NEED? - no?
 }
 
 void SearchDialog::updateRecentSearchList(const QModelIndex &modelIndex)
@@ -829,7 +832,8 @@ void SearchDialog::loadRecentSearches()
     QVariantMap map;
     QFile jsonFile(recentObjectSearchesJsonPath);
     if(!jsonFile.open(QIODevice::ReadOnly))
-        qWarning() << "[Search] Can not open data file for recent searches" << QDir::toNativeSeparators(recentObjectSearchesJsonPath);
+        qWarning() << "[Search] Can not open data file for recent searches"
+                   << QDir::toNativeSeparators(recentObjectSearchesJsonPath);
 
     else
     {
@@ -889,22 +893,24 @@ QStringList SearchDialog::listMatchingRecentObjects(const QString& objPrefix, in
     }
 
     QString word;
-    // For all recent objects - prepend to recent list
+    // For all recent objects:
     for (int i = 0; i < recentObjectSearchesData.recentSearchList.size(); i++)
     {
         // Match with beginning of word
         if(useStartOfWords && recentObjectSearchesData.recentSearchList[i].startsWith(objPrefix, Qt::CaseInsensitive))
         {
-            result.prepend(recentObjectSearchesData.recentSearchList[i]);
-            maxNbItem--;
-            continue;
+            result.append(recentObjectSearchesData.recentSearchList[i]);
         }
 
        // Match search anywhere in word
-        if(!useStartOfWords && recentObjectSearchesData.recentSearchList[i].contains(objPrefix, Qt::CaseInsensitive))
+        else if(!useStartOfWords && recentObjectSearchesData.recentSearchList[i].contains(objPrefix, Qt::CaseInsensitive))
         {
-            result.prepend(recentObjectSearchesData.recentSearchList[i]);
-            maxNbItem--; // TODO: Need maxNbItem?
+            result.append(recentObjectSearchesData.recentSearchList[i]);
+        }
+
+        if (result.size() >= maxNbItem)
+        {
+            break;
         }
     }
     return result;

@@ -20,7 +20,7 @@
 #ifndef SEARCHDIALOG_HPP
 #define SEARCHDIALOG_HPP
 
-#include <QObject>))
+#include <QObject>
 #include <QLabel>
 #include <QMap>
 #include <QHash>
@@ -304,12 +304,11 @@ private:
 	// The current coordinate system
 	CoordinateSystem currentCoordinateSystem;
 
-    //! Recent object searches properties
+    //! Recent object searches members
     recentObjectSearchStruct recentObjectSearchesData;
     QString recentObjectSearchesJsonPath;
-    QStringList listMatchingRecentObjects(const QString& objPrefix, int maxNbItem=5, bool useStartOfWords=false) const;
 
-    //! Recent object search functions
+    QStringList listMatchingRecentObjects(const QString& objPrefix, int maxNbItem=5, bool useStartOfWords=false) const;
     void updateRecentSearchList();
     void updateRecentSearchList(const QString &nameI18n);
     void updateRecentSearchList(const QModelIndex &modelIndex);
