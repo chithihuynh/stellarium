@@ -58,7 +58,6 @@
 
 #include "SimbadSearcher.hpp"
 
-
 // Start of members for class CompletionLabel
 CompletionLabel::CompletionLabel(QWidget* parent) : QLabel(parent), selectedIdx(0)
 {
