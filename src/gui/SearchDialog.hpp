@@ -20,9 +20,7 @@
 #ifndef SEARCHDIALOG_HPP
 #define SEARCHDIALOG_HPP
 
-
-#include <QStandardItemModel> // Maybe removep
-#include <QObject>
+#include <QObject>))
 #include <QLabel>
 #include <QMap>
 #include <QHash>

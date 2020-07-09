@@ -180,10 +180,8 @@ SearchDialog::SearchDialog(QObject* parent)
 	setSimbadGetsTypes( conf->value("search/simbad_query_types",      false).toBool());
 	setSimbadGetsDims(  conf->value("search/simbad_query_dimensions", false).toBool());
 
-    // Recent object search
+    // Recent object search init
     recentObjectSearchesData.maxSize = 10;
-
-    recentObjectSearchListModel = new QStandardItemModel(0, ColumnRecentObjectList);
     recentObjectSearchesJsonPath = StelFileMgr::findFile("data", (StelFileMgr::Flags)(StelFileMgr::Directory | StelFileMgr::Writable)) + "/recentObjectSearches.json";
 }
 
@@ -195,8 +193,6 @@ SearchDialog::~SearchDialog()
 		simbadReply->deleteLater();
 		simbadReply = Q_NULLPTR;
 	}
-
-    delete recentObjectSearchListModel;
 }
 
 void SearchDialog::retranslate()
@@ -811,14 +807,12 @@ void SearchDialog::updateRecentSearchList(const QString &nameI18n)
     {
         recentObjectSearchesData.recentSearchList.prepend(objectWord);
 
-        // Remove oldest search if greater than list size
+        // Remove oldest search if greater than max list size
         if( recentObjectSearchesData.recentSearchList.size() > recentObjectSearchesData.maxSize)
         {
             // Make sure list is not empty - REMOVE? Probably not going to happen
             if(!recentObjectSearchesData.recentSearchList.isEmpty())
-            {
                 recentObjectSearchesData.recentSearchList.removeLast();
-            }
         }
     }
 
@@ -899,7 +893,6 @@ QStringList SearchDialog::listMatchingRecentObjects(const QString& objPrefix, in
     // For all recent objects - prepend to recent list
     for (int i = 0; i < recentObjectSearchesData.recentSearchList.size(); i++)
     {
-
         // Match with beginning of word
         if(useStartOfWords && recentObjectSearchesData.recentSearchList[i].startsWith(objPrefix, Qt::CaseInsensitive))
         {
@@ -912,8 +905,7 @@ QStringList SearchDialog::listMatchingRecentObjects(const QString& objPrefix, in
         if(!useStartOfWords && recentObjectSearchesData.recentSearchList[i].contains(objPrefix, Qt::CaseInsensitive))
         {
             result.prepend(recentObjectSearchesData.recentSearchList[i]);
-            maxNbItem--;
-
+            maxNbItem--; // TODO: Need maxNbItem?
         }
     }
     return result;
