@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Stellarium
  * Copyright (C) 2008 Guillaume Chereau
  * 
@@ -20,6 +20,8 @@
 #ifndef SEARCHDIALOG_HPP
 #define SEARCHDIALOG_HPP
 
+
+#include <QStandardItemModel> // Maybe removep
 #include <QObject>
 #include <QLabel>
 #include <QMap>
@@ -40,14 +42,12 @@ struct stringLengthCompare
 	}
 };
 
-
 struct recentObjectSearchStruct
 {
-    int searchListIndex = 0;
-    int maxRecentListSize = 10;
+    int maxSize = 10;
     QStringList recentSearchList;
 };
-Q_DECLARE_METATYPE(recentObjectSearchStruct)
+Q_DECLARE_METATYPE(recentObjectSearchStruct) // TODO: QUESTION should this be a "Q_DECLARE_METATYPE" or something else (QStandardModel)?
 
 //! @class CompletionLabel
 //! Display a list of results matching the search string, and allow to
@@ -64,10 +64,8 @@ public:
 	void setValues(const QStringList&);
 	bool isEmpty() const {return values.isEmpty();}
 	void appendValues(const QStringList&);
-    void appendRecentValues(QStringList& v);
+    void appendRecentValues(const QStringList& v);
 	void clearValues();
-
-
 	
 public slots:
 	void selectNext();
@@ -75,9 +73,10 @@ public slots:
 	void selectFirst();
 
 private:
-	void updateText();
+    void updateText();
 	int selectedIdx;
 	QStringList values;
+    QStringList recentValues;
 };
 
 QT_FORWARD_DECLARE_CLASS(QListWidgetItem)
@@ -90,7 +89,7 @@ class SearchDialog : public StelDialog
 	Q_PROPERTY(bool useSimbad       READ simbadSearchEnabled WRITE enableSimbadSearch  NOTIFY simbadUseChanged)
 	Q_PROPERTY(int  simbadDist      READ getSimbadQueryDist  WRITE setSimbadQueryDist  NOTIFY simbadQueryDistChanged)
 	Q_PROPERTY(int  simbadCount     READ getSimbadQueryCount WRITE setSimbadQueryCount NOTIFY simbadQueryCountChanged)
-	Q_PROPERTY(bool simbadGetIds    READ getSimbadGetsIds    WRITE setSimbadGetsIds    NOTIFY simbadGetsIdsChanged)
+    Q_PROPERTY(bool simbadGetIds    READ getSimbadGetsIds    WRITE setSimbadGetsIds    NOTIFY simbadGetsIdsChanged)
 	Q_PROPERTY(bool simbadGetSpec   READ getSimbadGetsSpec   WRITE setSimbadGetsSpec   NOTIFY simbadGetsSpecChanged)
 	Q_PROPERTY(bool simbadGetMorpho READ getSimbadGetsMorpho WRITE setSimbadGetsMorpho NOTIFY simbadGetsMorphoChanged)
 	Q_PROPERTY(bool simbadGetTypes  READ getSimbadGetsTypes  WRITE setSimbadGetsTypes  NOTIFY simbadGetsTypesChanged)
@@ -116,7 +115,6 @@ public:
 	//! Notify that the application style changed
 	void styleChanged();
 	bool eventFilter(QObject *object, QEvent *event);
-
 
 	//! Replaces all occurences of substrings describing Greek letters (i.e. "alpha", "beta", ...)
 	//! with the actual Greek unicode characters.
@@ -183,17 +181,9 @@ private slots:
 	void gotoObject(const QModelIndex &modelIndex);
 
 	void searchListClear();
-
-    // RECENT OBJECT SEARCHES #TODO: Should this be in the "private slots" or just "private"?
-    QStringList listMatchingRecentObjects(const QString& objPrefix, int maxNbItem=5, bool useStartOfWords=false) const;
-    void updateRecentSearchList();
-    void updateRecentSearchList(const QString &nameI18n);
-    void updateRecentSearchList(const QModelIndex &modelIndex);
-    void loadRecentSearchList();
-    // TODO: How to generate "data/recentObjectSearch.json" during install
 	
 	//! Called when the user edit the manual position controls
-	void manualPositionChanged();
+    void manualPositionChanged();
 
 	//! Whether to use SIMBAD for searches or not.
 	void enableSimbadSearch(bool enable);
@@ -241,8 +231,6 @@ private slots:
 	void setSimbadGetsMorpho(bool b);
 	void setSimbadGetsTypes(bool b);
 	void setSimbadGetsDims(bool b);
-
-
 
 private:
 	class SearchDialogStaticData
@@ -317,6 +305,19 @@ private:
 
 	// The current coordinate system
 	CoordinateSystem currentCoordinateSystem;
+
+    //! Recent object searches properties
+    recentObjectSearchStruct recentObjectSearchesData;
+    QString recentObjectSearchesJsonPath;
+    QStringList listMatchingRecentObjects(const QString& objPrefix, int maxNbItem=5, bool useStartOfWords=false) const;
+
+    //! Recent object search functions
+    void updateRecentSearchList();
+    void updateRecentSearchList(const QString &nameI18n);
+    void updateRecentSearchList(const QModelIndex &modelIndex);
+    void loadRecentSearches();
+    void saveRecentSearches();
+    // TODO: How to generate "data/recentObjectSearch.json" during install
 
 public:
 	static QString extSearchText;

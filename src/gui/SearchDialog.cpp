@@ -34,6 +34,9 @@
 #include "StelGui.hpp"
 #include "StelUtils.hpp"
 
+#include "StelFileMgr.hpp"
+#include "StelJsonParser.hpp"
+
 #include <QDebug>
 #include <QFrame>
 #include <QLabel>
@@ -50,28 +53,15 @@
 #include <QClipboard>
 #include <QSortFilterProxyModel>
 #include <QStringListModel>
+#include <QFileDialog>
+#include <QDir>
 
 #include "SimbadSearcher.hpp"
-
-
-// Testing struct info for recent search
-recentObjectSearchStruct recentObjectSearch;
-QStringList rsl = recentObjectSearch.recentSearchList;
 
 
 // Start of members for class CompletionLabel
 CompletionLabel::CompletionLabel(QWidget* parent) : QLabel(parent), selectedIdx(0)
 {
-    rsl << "Orian" << "Polaris";
-
-//    QStringList rsl = recentObjectSearch.recentSearchList;
-    if (rsl.isEmpty())
-            qDebug() << ".....Empty";
-    else
-        for(int i = 0; i < rsl.size(); i++){
-            qDebug() << "recentSearchList:" << rsl[i];
-        }
-
 }
 
 CompletionLabel::~CompletionLabel()
@@ -80,7 +70,6 @@ CompletionLabel::~CompletionLabel()
 
 void CompletionLabel::setValues(const QStringList& v)
 {
-//    qDebug() << recentSearchObject
 	values=v;
     updateText();
 }
@@ -88,14 +77,13 @@ void CompletionLabel::setValues(const QStringList& v)
 void CompletionLabel::appendValues(const QStringList& v)
 {
 	values+=v;
-	updateText();
+    updateText();
 }
 
 
-void CompletionLabel::appendRecentValues(QStringList& v)
+void CompletionLabel::appendRecentValues(const QStringList& v)
 {
-    values+=v;
-    updateText();
+    recentValues = v;
 }
 
 void CompletionLabel::clearValues()
@@ -138,24 +126,20 @@ void CompletionLabel::updateText()
 {
     QString newText;
 
-// Regenerate the list with the selected item in bold
+    // Regenerate the list with the selected item in bold (and italicize recent items)
     for (int i=0;i<values.size();i++)
     {
-
         QString word = values[i];
-        qDebug() << word;
-        // Initalize recent searches
-        if(rsl.contains(word))
+
+        if(recentValues.contains(word))
             word = "<i>" + word + "</i>";
 
 		if (i==selectedIdx)
             newText+="<b>"+word+"</b>";
 		else
-
             newText+=word;
 		if (i!=values.size()-1)
 			newText += ", ";
-
 	}
 	setText(newText);
 }
@@ -195,6 +179,12 @@ SearchDialog::SearchDialog(QObject* parent)
 	setSimbadGetsMorpho(conf->value("search/simbad_query_morpho",     false).toBool());
 	setSimbadGetsTypes( conf->value("search/simbad_query_types",      false).toBool());
 	setSimbadGetsDims(  conf->value("search/simbad_query_dimensions", false).toBool());
+
+    // Recent object search
+    recentObjectSearchesData.maxSize = 10;
+
+    recentObjectSearchListModel = new QStandardItemModel(0, ColumnRecentObjectList);
+    recentObjectSearchesJsonPath = StelFileMgr::findFile("data", (StelFileMgr::Flags)(StelFileMgr::Directory | StelFileMgr::Writable)) + "/recentObjectSearches.json";
 }
 
 SearchDialog::~SearchDialog()
@@ -205,13 +195,15 @@ SearchDialog::~SearchDialog()
 		simbadReply->deleteLater();
 		simbadReply = Q_NULLPTR;
 	}
+
+    delete recentObjectSearchListModel;
 }
 
 void SearchDialog::retranslate()
 {
 	if (dialog)
 	{
-		QString text(ui->lineEditSearchSkyObject->text());
+        QString text(ui->lineEditSearchSkyObject->text());
 		ui->retranslateUi(dialog);
 		ui->lineEditSearchSkyObject->setText(text);
 		populateSimbadServerList();
@@ -472,6 +464,8 @@ void SearchDialog::createDialogContent()
 	ui->simbadStatusLabel->setStyleSheet(style);
 	ui->labelGreekLetterTitle->setStyleSheet(style);
 	ui->simbadCooStatusLabel->setStyleSheet(style);
+
+    loadRecentSearches();
 }
 
 void SearchDialog::changeTab(int index)
@@ -754,7 +748,6 @@ void SearchDialog::onSearchTextChanged(const QString& text)
             matches += objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, true);
             matches += objectMgr->listMatchingObjects(greekText, (greekTextMaxMbItem - matches.size()), useStartOfWords, false);
             matches += objectMgr->listMatchingObjects(greekText, (greekTextMaxMbItem - matches.size()), useStartOfWords, true);
-            // Maybe at recent search match here
 		}
 		else
 		{
@@ -762,93 +755,135 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 
             recentMatches = listMatchingRecentObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords);
 
-
             // TODO: DEBUG: Am I over calculating?
             // Update max size
             trimmedTextMaxNbItem -= recentMatches.size();
 
             matches  = objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, false);
             matches += objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, true);
-            // Maybe add recentSearch match here
 		}
+
 		// remove possible duplicates from completion list
 		matches.removeDuplicates();
         matches.sort(Qt::CaseInsensitive);
-
-        // Actually, add recent search here after sort and then remove Duplicates
 
 		// objects with short names should be searched first
 		// examples: Moon, Hydra (moon); Jupiter, Ghost of Jupiter
 		stringLengthCompare comparator;
 		std::sort(matches.begin(), matches.end(), comparator);
 
+        // Join both list (with recent first)
+        QStringList allMatches;
+        allMatches << recentMatches;
+        allMatches << matches;
+        allMatches.removeDuplicates();
+
         // Upate recent matches with "values"
-        ui->completionLabel->appendRecentValues(recentMatches);
+        ui->completionLabel->appendValues(allMatches);
 
-        // Append both list (with recent first)
-        recentMatches << matches;
-        recentMatches.removeDuplicates();
-
-//        qDebug() << "Size after remove of dup:" << recentMatches.size();
-
-        ui->completionLabel->setValues(recentMatches);
+        ui->completionLabel->setValues(allMatches);
 		ui->completionLabel->selectFirst();
 
 		// Update push button enabled state
 		ui->pushButtonGotoSearchSkyObject->setEnabled(true);
 	}
-
 }
 
 
 void SearchDialog::updateRecentSearchList()
 {
-    updateRecentSearchList(ui->completionLabel->getSelected());}
+    updateRecentSearchList(ui->completionLabel->getSelected());
+}
+
 void SearchDialog::updateRecentSearchList(const QString &nameI18n)
 {
     if(nameI18n.isEmpty())
         return;
 
-
-
-    QString objectWord = nameI18n;
-
-        qDebug() << "name:" << nameI18n << "|" << objectWord;
+    QString objectWord = nameI18n;      
     // Remove dup search and prepend to beginning
-    if( rsl.contains(objectWord) )
+    if(recentObjectSearchesData.recentSearchList.contains(objectWord) )
     {
-        rsl.removeOne(objectWord);
-        rsl.prepend(objectWord);
-        qDebug() << "u con: move: " << rsl;
+        recentObjectSearchesData.recentSearchList.removeOne(objectWord);
+        recentObjectSearchesData.recentSearchList.prepend(objectWord);
     }
     else
     {
-        rsl.prepend(objectWord);
-        recentObjectSearch.searchListIndex++;
+        recentObjectSearchesData.recentSearchList.prepend(objectWord);
 
         // Remove oldest search if greater than list size
-        if( rsl.size() > recentObjectSearch.maxRecentListSize)
+        if( recentObjectSearchesData.recentSearchList.size() > recentObjectSearchesData.maxSize)
         {
-            if(!rsl.isEmpty())
+            // Make sure list is not empty - REMOVE? Probably not going to happen
+            if(!recentObjectSearchesData.recentSearchList.isEmpty())
             {
-                rsl.removeLast(); // Probably not going to happen
-                recentObjectSearch.searchListIndex--;
+                recentObjectSearchesData.recentSearchList.removeLast();
             }
-
         }
-
     }
 
-
+    // Update CompletionLabel's recent values
+    ui->completionLabel->appendRecentValues(recentObjectSearchesData.recentSearchList);
 }
 
 void SearchDialog::updateRecentSearchList(const QModelIndex &modelIndex)
 {
     updateRecentSearchList(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
 }
-void SearchDialog::loadRecentSearchList()
+
+void SearchDialog::loadRecentSearches()
 {
-    // TODO: recent search list
+    QVariantMap map;
+    QFile jsonFile(recentObjectSearchesJsonPath);
+    if(!jsonFile.open(QIODevice::ReadOnly))
+        qWarning() << "[Search] Can not open data file for recent searches" << QDir::toNativeSeparators(recentObjectSearchesJsonPath);
+
+    else
+    {
+        try
+        {
+            map = StelJsonParser::parse(jsonFile.readAll()).toMap();
+            jsonFile.close();
+
+            QVariantMap recentSearchData = map.value("recentObjectSearchStruct").toMap();
+            recentObjectSearchesData.maxSize = recentSearchData.value("maxSize").toInt();
+            recentObjectSearchesData.recentSearchList = recentSearchData.value("recentSearchList").toStringList(); // TODO: DEBUG: is ".toStringList" what I hsoudl use for QStringList?
+
+        }
+        catch (std::runtime_error &e)
+        {
+            qWarning() << "[Search] File format is Wrong! Error:" << e.what();
+            return;
+        }
+    }
+
+}
+void SearchDialog::saveRecentSearches()
+{
+    if(recentObjectSearchesJsonPath.isEmpty())
+    {
+        qWarning() << "[Search] Error in saving recent object searches";
+        return;
+    }
+
+    QFile jsonFile(recentObjectSearchesJsonPath);
+    if(!jsonFile.open(QFile::WriteOnly | QFile::Text))
+    {
+        qWarning() << "[Search] Recent search could not be save. A file can not be open for writing." << QDir::toNativeSeparators(recentObjectSearchesJsonPath);
+        return;
+    }
+
+
+    QVariantMap rslDataList;
+    rslDataList.insert("maxSize", recentObjectSearchesData.maxSize);
+    rslDataList.insert("recentSearchList", recentObjectSearchesData.recentSearchList);
+
+    QVariantMap rsList;
+    rsList.insert("recentObjectSearchStruct", rslDataList);
+
+    StelJsonParser::write(rsList, &jsonFile);
+    jsonFile.flush();
+    jsonFile.close();
 }
 
 QStringList SearchDialog::listMatchingRecentObjects(const QString& objPrefix, int maxNbItem, bool useStartOfWords) const
@@ -862,21 +897,21 @@ QStringList SearchDialog::listMatchingRecentObjects(const QString& objPrefix, in
 
     QString word;
     // For all recent objects - prepend to recent list
-    for (int i = 0; i < rsl.size(); i++)
+    for (int i = 0; i < recentObjectSearchesData.recentSearchList.size(); i++)
     {
 
         // Match with beginning of word
-        if(useStartOfWords && rsl[i].startsWith(objPrefix, Qt::CaseInsensitive))
+        if(useStartOfWords && recentObjectSearchesData.recentSearchList[i].startsWith(objPrefix, Qt::CaseInsensitive))
         {
-            result.prepend(rsl[i]);
+            result.prepend(recentObjectSearchesData.recentSearchList[i]);
             maxNbItem--;
             continue;
         }
 
        // Match search anywhere in word
-        if(!useStartOfWords && rsl[i].contains(objPrefix, Qt::CaseInsensitive))
+        if(!useStartOfWords && recentObjectSearchesData.recentSearchList[i].contains(objPrefix, Qt::CaseInsensitive))
         {
-            result.prepend(rsl[i]);
+            result.prepend(recentObjectSearchesData.recentSearchList[i]);
             maxNbItem--;
 
         }
@@ -953,7 +988,7 @@ void SearchDialog::onSimbadStatusChanged()
 	{
 		disconnect(simbadReply, SIGNAL(statusChanged()), this, SLOT(onSimbadStatusChanged()));
 		delete simbadReply;
-		simbadReply=Q_NULLPTR;
+        simbadReply=Q_NULLPTR;
 
 		// Update push button enabled state
 		ui->pushButtonGotoSearchSkyObject->setEnabled(!ui->completionLabel->isEmpty());
@@ -978,24 +1013,17 @@ void SearchDialog::greekLetterClicked()
 
 void SearchDialog::gotoObject()
 {
-    qDebug() << "gotoObject() Entered";
-    qDebug() << "ui:" << ui;
-    qDebug() << "ui->completeLabel:" << ui->completionLabel;
-    qDebug() << "ui->completeLabel->getSelected():" << ui->completionLabel->getSelected();
-    qDebug() << "calling gotoObject(...): " << ui->completionLabel->getSelected();
 	gotoObject(ui->completionLabel->getSelected());
-    qDebug() << "gotoObject() exit";
 }
 
 void SearchDialog::gotoObject(const QString &nameI18n)
 {
-    qDebug() << "gotoObject(&nameI18n) Entered:" << nameI18n;
 	if (nameI18n.isEmpty())
 		return;
 
-    // Update recent search list
+    // Update and save recent search list
     updateRecentSearchList();
-
+    saveRecentSearches();
 
 	StelMovementMgr* mvmgr = GETSTELMODULE(StelMovementMgr);
 	if (simbadResults.contains(nameI18n))
@@ -1063,18 +1091,12 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 		}
     }
 
-    qDebug() << "(gotoObject) simbadResults: " << simbadResults;
-    qDebug() << "(gotoObject) objectMgr: " << objectMgr;
-
     simbadResults.clear();
-    qDebug() << "gotoObject(&nameI18n) Exit";
 }
 
-void SearchDialog::gotoObject(const QModelIndex &modelIndex):::
+void SearchDialog::gotoObject(const QModelIndex &modelIndex)
 {
-    qDebug() << "gotoObject(&modelIndex) Entered";
-	gotoObject(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
-    qDebug() << "gotoObject(&modelIndex) Exit";
+    gotoObject(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
 }
 
 void SearchDialog::searchListClear()
@@ -1249,7 +1271,7 @@ void SearchDialog::showContextMenu(const QPoint &pt)
 	}
 
 	menu->addAction(q_("Paste and Search") + clipText, this, SLOT(pasteAndGo()));
-	menu->exec(ui->lineEditSearchSkyObject->mapToGlobal(pt));
+    menu->exec(ui->lineEditSearchSkyObject->mapToGlobal(pt));
 	delete menu;
 }
 
