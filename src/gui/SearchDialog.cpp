@@ -55,6 +55,7 @@
 #include <QStringListModel>
 #include <QFileDialog>
 #include <QDir>
+#include <QSet>
 
 #include "SimbadSearcher.hpp"
 
@@ -82,14 +83,14 @@ void CompletionLabel::appendValues(const QStringList& v)
 
 void CompletionLabel::appendRecentValues(const QStringList& v)
 {
-    recentValues = v;
+    recentValues += v;
 }
 
-void CompletionLabel::clearValues()
+void CompletionLabel::clearValues() // TODO: Debug: should I be "clearing" the recentValues also?
 {
 	values.clear();
 	selectedIdx=0;
-	updateText();
+    updateText();
 }
 
 QString CompletionLabel::getSelected() const
@@ -179,20 +180,9 @@ SearchDialog::SearchDialog(QObject* parent)
 	setSimbadGetsTypes( conf->value("search/simbad_query_types",      false).toBool());
 	setSimbadGetsDims(  conf->value("search/simbad_query_dimensions", false).toBool());
 
-    // Recent object search init
-    recentObjectSearchesData.maxSize = 10;
-    try
-    {
-        recentObjectSearchesJsonPath = StelFileMgr::findFile("data",
-                                                             (StelFileMgr::Flags)
-                                                             (StelFileMgr::Directory |
-                                                              StelFileMgr::Writable)) + "/recentObjectSearches.json";
-    }
-    catch (std::runtime_error& e)
-    {
-        qWarning() << "[Search] Could not locate file: data/recentObjectSearches.json : " << e.what();
-    }
-
+    // Find recent object search data
+    recentObjectSearchesJsonPath = StelFileMgr::findFile("data",
+                                                         (StelFileMgr::Flags)(StelFileMgr::Directory | StelFileMgr::Writable)) + "/recentObjectSearches.json";
 }
 
 SearchDialog::~SearchDialog()
@@ -695,9 +685,8 @@ void SearchDialog::manualPositionChanged()
 	mvmgr->setFlagLockEquPos(useLockPosition);
 }
 
-void SearchDialog::onSearchTextChanged(const QString& text)
-{
-	clearSimbadText(StelModule::ReplaceSelection);
+void SearchDialog::onSearchTextChanged(const QString& text){
+    clearSimbadText(StelModule::ReplaceSelection);
 	// This block needs to go before the trimmedText.isEmpty() or the SIMBAD result does not
 	// get properly cleared.
 	if (useSimbad) {
@@ -737,26 +726,53 @@ void SearchDialog::onSearchTextChanged(const QString& text)
         // Get possible recent object search
         QStringList recentMatches;
         QStringList matches;
+
+        QSet<QString> setIntersect;
+        QSet<QString> setRecentMatches;
+        QSet<QString> setMatches;
+
 		if(greekText != trimmedText)
 		{
+            // TODO:  DEBUG I don't know how to get here to check if it works
             int trimmedTextMaxNbItem = 8;
             int greekTextMaxMbItem = 18;
 
-            recentMatches = listMatchingRecentObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords);
-            recentMatches += listMatchingRecentObjects(greekText, (greekTextMaxMbItem - recentMatches.size()), useStartOfWords);
+            // Get recent matches
+            recentMatches = listMatchingRecentObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords);            
+            greekTextMaxMbItem = greekTextMaxMbItem - recentMatches.size();
+            recentMatches += listMatchingRecentObjects(greekText, (greekTextMaxMbItem), useStartOfWords);
+            setRecentMatches = QSet<QString>(recentMatches.begin(), recentMatches.end());
 
+            // Get rest of matches
+            trimmedTextMaxNbItem =  trimmedTextMaxNbItem - recentMatches.size();
             matches  = objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, false);
+            setMatches = QSet<QString>(matches.begin(), matches.end());
+            setIntersect = setRecentMatches.intersect(setMatches); // Adjust "maxSize" by counting duplicates
+
+            trimmedTextMaxNbItem = trimmedTextMaxNbItem - recentMatches.size() + setIntersect.size();
             matches += objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, true);
-            matches += objectMgr->listMatchingObjects(greekText, (greekTextMaxMbItem - matches.size()), useStartOfWords, false);
-            matches += objectMgr->listMatchingObjects(greekText, (greekTextMaxMbItem - matches.size()), useStartOfWords, true);
+
+            greekTextMaxMbItem = greekTextMaxMbItem - recentMatches.size() - matches.size();
+            matches += objectMgr->listMatchingObjects(greekText, (greekTextMaxMbItem), useStartOfWords, false);
+            setMatches = QSet<QString>(matches.begin(), matches.end());
+            setIntersect = setRecentMatches.intersect(setMatches); // Adjust "maxSize" by counting duplicates
+
+            greekTextMaxMbItem = greekTextMaxMbItem - recentMatches.size() - matches.size() + setIntersect.size();
+            matches += objectMgr->listMatchingObjects(greekText, (greekTextMaxMbItem), useStartOfWords, true);
 		}
 		else
 		{
             int trimmedTextMaxNbItem = 13;
 
             recentMatches = listMatchingRecentObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords);
+            setRecentMatches = QSet<QString>(recentMatches.begin(), recentMatches.end());
 
+            trimmedTextMaxNbItem = trimmedTextMaxNbItem - recentMatches.size();
             matches  = objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, false);
+            setMatches = QSet<QString>(matches.begin(), matches.end());
+            setIntersect = setRecentMatches.intersect(setMatches); // Adjust "maxSize" by counting duplicates
+
+            trimmedTextMaxNbItem = trimmedTextMaxNbItem - recentMatches.size() + setIntersect.size();
             matches += objectMgr->listMatchingObjects(trimmedText, trimmedTextMaxNbItem, useStartOfWords, true);
 		}
 
@@ -771,13 +787,14 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 
         // Join both list (with recent first)
         QStringList allMatches;
-        allMatches << recentMatches;
-        allMatches << matches;
+        allMatches << recentMatches << matches;
+
+        // Remove possible duplicates from both list
         allMatches.removeDuplicates();
 
         // Upate recent matches with "values"
-        ui->completionLabel->appendValues(allMatches);
         ui->completionLabel->appendRecentValues(recentMatches);
+        ui->completionLabel->appendValues(allMatches);
 
         ui->completionLabel->setValues(allMatches);
 		ui->completionLabel->selectFirst();
@@ -971,6 +988,8 @@ void SearchDialog::onSimbadStatusChanged()
 	{
 		simbadResults = simbadReply->getResults();
         ui->completionLabel->appendValues(simbadResults.keys());
+        ui->completionLabel->appendRecentValues(recentObjectSearchesData.recentSearchList); // TODO: DEBUG: NEEDED? or extra work?
+
 		// Update push button enabled state
         ui->pushButtonGotoSearchSkyObject->setEnabled(!ui->completionLabel->isEmpty());
 	}
