@@ -88,6 +88,8 @@ void CompletionLabel::appendRecentValues(const QStringList& v)
 
 void CompletionLabel::clearValues() // TODO: Debug: should I be "clearing" the recentValues also?
 {
+    recentValues.clear();
+
 	values.clear();
 	selectedIdx=0;
     updateText();
@@ -820,7 +822,6 @@ void SearchDialog::updateRecentSearchList(const QString &nameI18n)
     if(recentObjectSearchesData.recentSearchList.contains(objectWord))
     {
         recentObjectSearchesData.recentSearchList.removeOne(objectWord);
-//        recentObjectSearchesData.recentSearchList.prepend(objectWord);
     }
 
     // Prepend to list
@@ -835,8 +836,6 @@ void SearchDialog::updateRecentSearchList(const QString &nameI18n)
             recentObjectSearchesData.recentSearchList.removeLast();
         }
     }
-    // Update CompletionLabel's recent values
-//    ui->completionLabel->appendRecentValues(recentObjectSearchesData.recentSearchList); // NEED? - no?
 }
 
 void SearchDialog::updateRecentSearchList(const QModelIndex &modelIndex)
@@ -988,7 +987,6 @@ void SearchDialog::onSimbadStatusChanged()
 	{
 		simbadResults = simbadReply->getResults();
         ui->completionLabel->appendValues(simbadResults.keys());
-        ui->completionLabel->appendRecentValues(recentObjectSearchesData.recentSearchList); // TODO: DEBUG: NEEDED? or extra work?
 
 		// Update push button enabled state
         ui->pushButtonGotoSearchSkyObject->setEnabled(!ui->completionLabel->isEmpty());
