@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Stellarium
  * Copyright (C) 2008 Guillaume Chereau
  * 
@@ -40,6 +40,13 @@ struct stringLengthCompare
 	}
 };
 
+struct recentObjectSearches
+{
+	int maxSize = 10;
+	QStringList recentList;
+};
+Q_DECLARE_METATYPE(recentObjectSearches)
+
 //! @class CompletionLabel
 //! Display a list of results matching the search string, and allow to
 //! tab through those selections.
@@ -52,9 +59,10 @@ public:
 	~CompletionLabel();
 
 	QString getSelected(void) const;
-	void setValues(const QStringList&);
+	void setValues(const QStringList&, const QStringList&);
 	bool isEmpty() const {return values.isEmpty();}
 	void appendValues(const QStringList&);
+	void appendRecentValues(const QStringList&);
 	void clearValues();
 	
 public slots:
@@ -66,6 +74,7 @@ private:
 	void updateText();
 	int selectedIdx;
 	QStringList values;
+	QStringList recentValues;
 };
 
 QT_FORWARD_DECLARE_CLASS(QListWidgetItem)
@@ -296,8 +305,29 @@ private:
 	// The current coordinate system
 	CoordinateSystem currentCoordinateSystem;
 
+	// Properties for "recent object searches"
+	recentObjectSearches recentObjectSearchesData;
+	QString recentObjectSearchesJsonPath;
+
+	//! Adds object to "recent search list" (called from gotoObject...)
+	void updateRecentSearchList();
+	void updateRecentSearchList(const QString &nameI18n); // Might not need
+	//! for going from list views
+	void updateRecentSearchList(const QModelIndex &modelIndex); // Might not need
+
+	//! Get data from previous session
+	void loadRecentSearches();
+	//! Save to file after each search
+	void saveRecentSearches();
+
 public:
 	static QString extSearchText;
+	
+	//! Find and return the list of at most maxNbItem objects auto-completing the passed object name.
+	//! @param maxNbItem the maximum number of returned object names.
+	//! @param useStartOfWords the autofill mode for returned objects names
+	//! @return a list of matching object names by order of recent searches, or an empty list if nothing match
+	QStringList listMatchingRecentObjects(const QString& objPrefix, int maxNbItem=5, bool useStartOfWords=false) const;
 };
 
 #endif // _SEARCHDIALOG_HPP
