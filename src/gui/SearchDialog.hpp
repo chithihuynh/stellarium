@@ -24,6 +24,7 @@
 #include <QLabel>
 #include <QMap>
 #include <QHash>
+#include <QDialog>
 #include "StelDialog.hpp"
 #include "VecMath.hpp"
 
@@ -59,7 +60,7 @@ public:
 	~CompletionLabel();
 
 	QString getSelected(void) const;
-	void setValues(const QStringList&, const QStringList&);
+	void setValues(const QStringList&, const QStringList&, const int);
 	bool isEmpty() const {return values.isEmpty();}
 	void appendValues(const QStringList&);
 	void appendRecentValues(const QStringList&);
@@ -75,6 +76,7 @@ private:
 	int selectedIdx;
 	QStringList values;
 	QStringList recentValues;
+	int maxSize;
 };
 
 QT_FORWARD_DECLARE_CLASS(QListWidgetItem)
@@ -236,8 +238,13 @@ private slots:
 	void setSimbadGetsTypes(bool b);
 	void setSimbadGetsDims(bool b);
 
+	//! Change font until change has been accepted or rejected to not mislead
+	//! user on what the max size is currently set to
+	void recentSearchSizeChanged();
 	//! Update recent list's max size
-	void recentSearchSizeClicked();
+	void recentSearchSizeAccepted();
+	//! Restore previous max size
+	void recentSearchSizeRejected();
 
 private:
 	class SearchDialogStaticData
@@ -327,9 +334,8 @@ private:
 	void loadRecentSearches();
 	//! Save to file after each search
 	void saveRecentSearches();
-	//! Change list according to max or append object
+	//! Shrink list if needed
 	void adjustRecentList(int maxSize);
-
 
 public:
 	static QString extSearchText;
