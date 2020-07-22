@@ -1188,6 +1188,9 @@
               <property name="styleSheet">
                <string notr="true"/>
               </property>
+              <property name="alignment">
+               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+              </property>
               <property name="minimum">
                <number>0</number>
               </property>

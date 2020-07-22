@@ -69,11 +69,10 @@ CompletionLabel::~CompletionLabel()
 {
 }
 
-void CompletionLabel::setValues(const QStringList& v, const QStringList& rv, const int ms)
+void CompletionLabel::setValues(const QStringList& v, const QStringList& rv)
 {
 	values=v;
 	recentValues=rv;
-	maxSize = ms;
 	updateText();
 }
 
@@ -130,15 +129,14 @@ void CompletionLabel::updateText()
 	QString newText;
 	QString tempValue;
 
-	// Regenerate the list with the selected item in bold & italicized
-	// recent items
-	QStringList recentValuesAdjusted = recentValues.mid(0, maxSize);
+//	// Regenerate the list with the selected item in bold and/or italicized
+//	// recent items
 	for (int i=0;i<values.size();++i)
 	{
 		tempValue = values[i]; // Prevent change to orginial value
 
 		// Italicized recent values
-		if(recentValuesAdjusted.contains(tempValue))
+		if(recentValues.contains(tempValue))
 		{
 			tempValue="<i>"+tempValue+"</i>";
 		}
@@ -487,7 +485,13 @@ void SearchDialog::recentSearchSizeChanged()
 		ui->recentSearchSizeSpinBox->setStyleSheet("color:rgb(170, 0, 0);");
 		ui->recentSearchSizeSpinBox->show();
 	}
+	else
+	{
+		// Revert to normal text if font was changed before
+		ui->recentSearchSizeSpinBox->setStyleSheet("color:black;");
+	}
 }
+
 void SearchDialog::changeTab(int index)
 {
 	if (index==0) // Search Tab
@@ -521,7 +525,6 @@ void SearchDialog::enableSimbadSearch(bool enable)
 	if (dialog && ui->simbadCooStatusLabel) ui->simbadCooStatusLabel->clear();
 	emit simbadUseChanged(enable);
 }
-
 
 void SearchDialog::setSimbadQueryDist(int dist)
 {
@@ -573,7 +576,7 @@ void SearchDialog::setSimbadGetsDims(bool b)
 
 void SearchDialog::recentSearchSizeAccepted()
 {
-
+	// Update max size in dialog and user data
 	int maxSize = ui->recentSearchSizeSpinBox->value();
 	setRecentSearchSize(maxSize);
 
@@ -868,7 +871,7 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		ui->completionLabel->appendValues(allMatches);
 		ui->completionLabel->appendRecentValues(recentMatches);
 
-		ui->completionLabel->setValues(allMatches, recentMatches, recentObjectSearchesData.maxSize);
+		ui->completionLabel->setValues(allMatches, recentMatches);
 		ui->completionLabel->selectFirst();
 
 		// Update push button enabled state
@@ -952,7 +955,6 @@ void SearchDialog::loadRecentSearches()
 			ui->recentSearchSizeSpinBox->setValue(recentObjectSearchesData.maxSize);
 
 			recentObjectSearchesData.recentList = recentSearchData.value("recentList").toStringList();
-
 		}
 		catch (std::runtime_error &e)
 		{

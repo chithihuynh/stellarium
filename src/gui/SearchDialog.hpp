@@ -60,7 +60,7 @@ public:
 	~CompletionLabel();
 
 	QString getSelected(void) const;
-	void setValues(const QStringList&, const QStringList&, const int);
+	void setValues(const QStringList&, const QStringList&);
 	bool isEmpty() const {return values.isEmpty();}
 	void appendValues(const QStringList&);
 	void appendRecentValues(const QStringList&);
@@ -76,7 +76,6 @@ private:
 	int selectedIdx;
 	QStringList values;
 	QStringList recentValues;
-	int maxSize;
 };
 
 QT_FORWARD_DECLARE_CLASS(QListWidgetItem)
@@ -115,7 +114,6 @@ public:
 	//! Notify that the application style changed
 	void styleChanged();
 	bool eventFilter(QObject *object, QEvent *event);
-
 
 	//! Replaces all occurences of substrings describing Greek letters (i.e. "alpha", "beta", ...)
 	//! with the actual Greek unicode characters.
