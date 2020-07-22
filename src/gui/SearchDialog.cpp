@@ -471,6 +471,7 @@ void SearchDialog::createDialogContent()
 
 	// Get data from previous session
 	loadRecentSearches();
+	connect(ui->recentSearchSizePushButton, SIGNAL(clicked(bool)), this, SLOT(recentSearchSizeClicked()));
 }
 
 void SearchDialog::changeTab(int index)
@@ -554,6 +555,12 @@ void SearchDialog::setSimbadGetsDims(bool b)
 	simbadGetDims=b;
 	conf->setValue("search/simbad_query_dimensions", b);
 	emit simbadGetsDimsChanged(b);
+}
+
+void SearchDialog::recentSearchSizeClicked()
+{
+	int maxSize = ui->recentSearchSizeSpinBox->value();
+	setRecentSearchSize(maxSize);
 }
 
 void SearchDialog::enableStartOfWordsAutofill(bool enable)
@@ -854,14 +861,21 @@ void SearchDialog::updateRecentSearchList(const QString &nameI18n)
 	recentObjectSearchesData.recentList.prepend(objectWord);
 	recentObjectSearchesData.recentList.removeDuplicates();
 
+	adjustRecentList(recentObjectSearchesData.maxSize);
+}
+
+void SearchDialog::adjustRecentList(int maxSize)
+{
+	// Check if max size was updated recently
+	maxSize = (maxSize >= 0) ? maxSize : recentObjectSearchesData.maxSize;
+	recentObjectSearchesData.maxSize = maxSize;
+
 	// Remove oldest search if size greater than max list size
-	if( recentObjectSearchesData.recentList.size() > recentObjectSearchesData.maxSize)
+	if( recentObjectSearchesData.recentList.size() > maxSize)
 	{
-		// Make sure list is not empty
-		if(!recentObjectSearchesData.recentList.isEmpty())
-		{
-			recentObjectSearchesData.recentList.removeLast();
-		}
+		recentObjectSearchesData.recentList =
+				recentObjectSearchesData.recentList.mid(0,
+									maxSize);
 	}
 }
 
@@ -879,6 +893,9 @@ void SearchDialog::loadRecentSearches()
 	{
 		qWarning() << "[Search] Can not open data file for recent searches"
 			   << QDir::toNativeSeparators(recentObjectSearchesJsonPath);
+
+		// Use default value for recent search size
+		setRecentSearchSize(ui->recentSearchSizeSpinBox->value());
 	}
 	else
 	{
@@ -891,10 +908,15 @@ void SearchDialog::loadRecentSearches()
 
 			QVariantMap recentSearchData = map.value("recentObjectSearches").toMap();
 
+			// Get user data if possible
 			readMaxSize = recentSearchData.value("maxSize").toInt();
-			recentObjectSearchesData.maxSize = readMaxSize ? readMaxSize : recentObjectSearchesData.maxSize;
+			recentObjectSearchesData.maxSize = (readMaxSize >= 0) ? readMaxSize : recentObjectSearchesData.maxSize; // Non-negative size only
 
-			recentObjectSearchesData.recentList = recentSearchData.value("recentList").toStringList(); // TODO: DEBUG: is ".toStringList" what I hsoudl use for QStringList?
+			// Update dialog size to match user's preference
+			ui->recentSearchSizeSpinBox->setValue(recentObjectSearchesData.maxSize);
+
+			recentObjectSearchesData.recentList = recentSearchData.value("recentList").toStringList();
+
 		}
 		catch (std::runtime_error &e)
 		{
@@ -1236,6 +1258,13 @@ void SearchDialog::populateSimbadServerList()
 	servers->setCurrentIndex(index);
 	servers->model()->sort(0);
 	servers->blockSignals(false);
+}
+
+void SearchDialog::setRecentSearchSize(int maxSize)
+{
+	adjustRecentList(maxSize);
+	saveRecentSearches();
+	conf->setValue("search/recentSearchSize", recentObjectSearchesData.maxSize);
 }
 
 void SearchDialog::selectSimbadServer(int index)

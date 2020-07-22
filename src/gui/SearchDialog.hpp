@@ -1,22 +1,22 @@
 ﻿/*
  * Stellarium
  * Copyright (C) 2008 Guillaume Chereau
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Suite 500, Boston, MA  02110-1335, USA.
 */
- 
+
 #ifndef SEARCHDIALOG_HPP
 #define SEARCHDIALOG_HPP
 
@@ -42,7 +42,7 @@ struct stringLengthCompare
 
 struct recentObjectSearches
 {
-	int maxSize = 10;
+	int maxSize = 20;
 	QStringList recentList;
 };
 Q_DECLARE_METATYPE(recentObjectSearches)
@@ -64,7 +64,7 @@ public:
 	void appendValues(const QStringList&);
 	void appendRecentValues(const QStringList&);
 	void clearValues();
-	
+
 public slots:
 	void selectNext();
 	void selectPrevious();
@@ -158,6 +158,11 @@ public slots:
 	void populateCoordinateSystemsList();
 	void populateCoordinateAxis();
 
+	//! Returns current max size of recent search list
+	int  getRecentSearchSize () const { return recentObjectSearchesData.maxSize;}
+	//! Called when user wants to change recent search list size
+	void setRecentSearchSize(int maxSize);
+
 protected:
 	Ui_searchDialogForm* ui;
 	//! Initialize the dialog widgets and connect the signals/slots
@@ -173,14 +178,14 @@ private slots:
 	void onSimbadStatusChanged();
 	//! Called when the user changed the input text
 	void onSearchTextChanged(const QString& text);
-	
+
 	void gotoObject();
 	void gotoObject(const QString& nameI18n);
 	// for going from list views
 	void gotoObject(const QModelIndex &modelIndex);
 
 	void searchListClear();
-	
+
 	//! Called when the user edit the manual position controls
 	void manualPositionChanged();
 
@@ -230,6 +235,9 @@ private slots:
 	void setSimbadGetsMorpho(bool b);
 	void setSimbadGetsTypes(bool b);
 	void setSimbadGetsDims(bool b);
+
+	//! Update recent list's max size
+	void recentSearchSizeClicked();
 
 private:
 	class SearchDialogStaticData
@@ -288,7 +296,7 @@ private:
 	bool useSimbad;
 	bool useFOVCenterMarker;
 	bool fovCenterMarkerState;
-	//! URL of the server used for SIMBAD queries. 
+	//! URL of the server used for SIMBAD queries.
 	QString simbadServerUrl;
 
 	//! Properties for SIMBAD position query
@@ -319,10 +327,13 @@ private:
 	void loadRecentSearches();
 	//! Save to file after each search
 	void saveRecentSearches();
+	//! Change list according to max or append object
+	void adjustRecentList(int maxSize);
+
 
 public:
 	static QString extSearchText;
-	
+
 	//! Find and return the list of at most maxNbItem objects auto-completing the passed object name.
 	//! @param maxNbItem the maximum number of returned object names.
 	//! @param useStartOfWords the autofill mode for returned objects names
