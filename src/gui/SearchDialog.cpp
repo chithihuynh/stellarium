@@ -56,6 +56,7 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QSet>
+#include <QDialog>
 
 #include "SimbadSearcher.hpp"
 
@@ -68,10 +69,11 @@ CompletionLabel::~CompletionLabel()
 {
 }
 
-void CompletionLabel::setValues(const QStringList& v, const QStringList& rv)
+void CompletionLabel::setValues(const QStringList& v, const QStringList& rv, const int ms)
 {
 	values=v;
 	recentValues=rv;
+	maxSize = ms;
 	updateText();
 }
 
@@ -130,12 +132,13 @@ void CompletionLabel::updateText()
 
 	// Regenerate the list with the selected item in bold & italicized
 	// recent items
+	QStringList recentValuesAdjusted = recentValues.mid(0, maxSize);
 	for (int i=0;i<values.size();++i)
 	{
 		tempValue = values[i]; // Prevent change to orginial value
 
 		// Italicized recent values
-		if(recentValues.contains(tempValue))
+		if(recentValuesAdjusted.contains(tempValue))
 		{
 			tempValue="<i>"+tempValue+"</i>";
 		}
@@ -471,9 +474,20 @@ void SearchDialog::createDialogContent()
 
 	// Get data from previous session
 	loadRecentSearches();
-	connect(ui->recentSearchSizePushButton, SIGNAL(clicked(bool)), this, SLOT(recentSearchSizeClicked()));
+	connect(ui->recentSearchSizeSpinBox, SIGNAL(valueChanged(int)), this, SLOT(recentSearchSizeChanged()));
+	connect(ui->recentSearchSizeButtonBox, SIGNAL(accepted()), this, SLOT(recentSearchSizeAccepted()));
+	connect(ui->recentSearchSizeButtonBox, SIGNAL(rejected()), this, SLOT(recentSearchSizeRejected()));
 }
 
+void SearchDialog::recentSearchSizeChanged()
+{
+	// Font color change if changed value was not confirmed/rejected
+	if(ui->recentSearchSizeSpinBox->value() != recentObjectSearchesData.maxSize)
+	{
+		ui->recentSearchSizeSpinBox->setStyleSheet("color:rgb(170, 0, 0);");
+		ui->recentSearchSizeSpinBox->show();
+	}
+}
 void SearchDialog::changeTab(int index)
 {
 	if (index==0) // Search Tab
@@ -557,10 +571,25 @@ void SearchDialog::setSimbadGetsDims(bool b)
 	emit simbadGetsDimsChanged(b);
 }
 
-void SearchDialog::recentSearchSizeClicked()
+void SearchDialog::recentSearchSizeAccepted()
 {
+
 	int maxSize = ui->recentSearchSizeSpinBox->value();
 	setRecentSearchSize(maxSize);
+
+	// Return font to normal
+	ui->recentSearchSizeSpinBox->setStyleSheet("background-color:gray");
+	ui->recentSearchSizeSpinBox->show();
+}
+
+void SearchDialog::recentSearchSizeRejected()
+{
+	// Reset to previous value
+	ui->recentSearchSizeSpinBox->setValue(recentObjectSearchesData.maxSize);
+
+	// Return font to normal
+	ui->recentSearchSizeSpinBox->setStyleSheet("background-color:gray;");
+	ui->recentSearchSizeSpinBox->show();
 }
 
 void SearchDialog::enableStartOfWordsAutofill(bool enable)
@@ -814,6 +843,9 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		stringLengthCompare comparator;
 		std::sort(matches.begin(), matches.end(), comparator);
 
+		// Adjust recent matches to prefered max size
+		recentMatches = recentMatches.mid(0, recentObjectSearchesData.maxSize);
+
 		// Find total size of both matches
 		tempMatches << recentMatches << matches; // unsorted
 		tempMatches.removeDuplicates();
@@ -836,7 +868,7 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		ui->completionLabel->appendValues(allMatches);
 		ui->completionLabel->appendRecentValues(recentMatches);
 
-		ui->completionLabel->setValues(allMatches, recentMatches);
+		ui->completionLabel->setValues(allMatches, recentMatches, recentObjectSearchesData.maxSize);
 		ui->completionLabel->selectFirst();
 
 		// Update push button enabled state
@@ -856,26 +888,30 @@ void SearchDialog::updateRecentSearchList(const QString &nameI18n)
 		return;
 	}
 
-	QString objectWord = nameI18n;
 	// Prepend & remove duplicates
-	recentObjectSearchesData.recentList.prepend(objectWord);
+	recentObjectSearchesData.recentList.prepend(nameI18n);
 	recentObjectSearchesData.recentList.removeDuplicates();
 
 	adjustRecentList(recentObjectSearchesData.maxSize);
 }
 
 void SearchDialog::adjustRecentList(int maxSize)
-{
+{	
 	// Check if max size was updated recently
 	maxSize = (maxSize >= 0) ? maxSize : recentObjectSearchesData.maxSize;
 	recentObjectSearchesData.maxSize = maxSize;
 
-	// Remove oldest search if size greater than max list size
-	if( recentObjectSearchesData.recentList.size() > maxSize)
+	// Max amount of saved values "allowed"
+	int spinBoxMaxSize = ui->recentSearchSizeSpinBox->maximum();
+
+	// Only removing old searches if the list grows larger than the largest
+	// "allowed" size (to retain data in case the user switches from
+	// high to low size)
+	if( recentObjectSearchesData.recentList.size() > spinBoxMaxSize)
 	{
 		recentObjectSearchesData.recentList =
 				recentObjectSearchesData.recentList.mid(0,
-									maxSize);
+									spinBoxMaxSize);
 	}
 }
 
