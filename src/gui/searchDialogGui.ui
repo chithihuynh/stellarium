@@ -1140,6 +1140,9 @@
             <property name="text">
              <string>Use autofill only from the beginning of words</string>
             </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
            </widget>
           </item>
           <item>
@@ -1184,6 +1187,12 @@
                 <weight>75</weight>
                 <bold>true</bold>
                </font>
+              </property>
+              <property name="toolTip">
+               <string extracomment="Range: [0-99] recent search history size"/>
+              </property>
+              <property name="autoFillBackground">
+               <bool>true</bool>
               </property>
               <property name="styleSheet">
                <string notr="true"/>
