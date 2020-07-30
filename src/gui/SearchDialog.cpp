@@ -482,13 +482,14 @@ void SearchDialog::recentSearchSizeChanged()
 	// Font color change if changed value was not confirmed/rejected
 	if(ui->recentSearchSizeSpinBox->value() != recentObjectSearchesData.maxSize)
 	{
-		ui->recentSearchSizeSpinBox->setStyleSheet("color:rgb(170, 0, 0);");
-		ui->recentSearchSizeSpinBox->show();
+		ui->recentSearchSizeSpinBox->setStyleSheet("color:rgb(170, 0, 0);"
+							   "selection-background-color:rgb(170, 0, 0);"
+							   "selection-color:rgb(255, 255, 255);");
 	}
 	else
 	{
 		// Revert to normal text if font was changed before
-		ui->recentSearchSizeSpinBox->setStyleSheet("color:black;");
+		ui->recentSearchSizeSpinBox->setStyleSheet("color: rgb(31, 31, 31);");
 	}
 }
 
