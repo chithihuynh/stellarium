@@ -769,7 +769,7 @@ surveys automatically map on the proper body.
 \section{The Object Search Window}
 \label{sec:gui:search}
 
-\begin{figure}[p]
+u\begin{figure}[p]
 \centering\includegraphics[width=0.68\textwidth]{search_dialog.png}
 \caption{The Search Window: Objects}
 \label{fig:gui:search}
@@ -795,7 +795,7 @@ surveys automatically map on the proper body.
 
 
 \begin{figure}[tbp]
-\centering\includegraphics[width=0.68\textwidth,trim=0 50 0 0,clip]{search_dialog_option.png}
+\centering\includegraphics[width=0.68\textwidth,trim=0 50 0 0,clip]{search_dialog_option_updated.png}
 \caption{The Search Window: Options}
 \label{fig:gui:search:options}
 \end{figure}
@@ -809,10 +809,18 @@ what you have typed so far. The first of the list of matching objects
 will be highlighted. If you press the \key{\tab} key, the selection will change
 to the next item in the list. Hitting the \key{\return} key will center on the
 currently highlighted object and close the search dialog.
+%% TODO_CH: Note - the tab key does not go backward (even if use shift  + tab).  But the right and left arrow moves the highlighted position forward and backward respectively.
+
+% Draft:
+[...If you press the \key{\arrowkey{>}} or \key{\arrowkey{<}} keys, the selection 
+will change to the next or previous item in the list, respectively. ...]
 
 For example, suppose we want to locate Saturn's moon Mimas. 
+Open the Search window (\guibutton[0.5]{2.5}{btd_find.png}, \key{F3}, or \key{Ctrl+F}).
 Type the first letter of the name, \emph{m}, to see a list
-of objects whose name contains \emph{m}: Hau\emph{m}ea, \emph{M}iranda, U\emph{m}briel, \ldots 
+of objects whose name contains \emph{m}: \emph{M}iranda (UV), Psa\emph{m}athe (NX), U\emph{m}briel (UII), \ldots
+% Not how it is currently showing:
+% \emph{m}: Hau\emph{m}ea, \emph{M}iranda, U\emph{m}briel, \ldots 
 
 You may want at this point to have Stellarium rather propose object
 names with start with the string you enter. Do that in the Options tab
@@ -823,6 +831,22 @@ highlighted. Pressing \key{\return} now would go to Maia, but we want
 Mimas. We can either press \key{\tab} a few times to highlight Mimas
 and then hit \key{\return}, or we can continue to type the name until
 it is the first/only object in the list.
+% TODO_CH: or the \key{\arrowkey{>}} to highlight 'Mimas' @ tabs
+
+% Example with "recent searches" saved
+At this time, your search result will be record. This will enable the search 
+results to prioritize your most recent searches (which will also be italized 
+and/or highlighted). Continuing with our example, open the Object Search window
+again and re-enter \emph{m} to generate a list similar to: \emph{M}imas, \emph{M}aia, 
+\emph{M}ars, \ldots. Since Mimas, was your most recent searched 
+object, it will be the first name highlighted and italized.    
+
+% Explain recent search history size
+Shown in Fig. ~\ref{fig:gui:search:options}, you can change the size of your search history 
+(ranging from 0-99) by moving to the Options tab of this panel.
+To update the size, click \keys{OK}. To revert back to the previous size, click \keys{Cancel}. 
+A recent search history size with a red coloring indicates that you changed the size without clicking either \keys{OK} or \keys{Cancel}. This means that the size has not updated yet. 
+
 
 The SIMBAD tab (Fig.~\ref{fig:gui:search:simbad}) provides a
 convenient way to fetch and show a set of information for selected
