@@ -883,6 +883,28 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 void SearchDialog::updateRecentSearchList()
 {
 	updateRecentSearchList(ui->completionLabel->getSelected());
+//	int index =  ui->tabWidget->currentIndex();
+
+//	// Update depends on current tab
+//	if(index == 0) // Object tab
+//	{
+//		updateRecentSearchList(ui->completionLabel->getSelected());
+//	}
+//	else if(index == 1) // SIMBAD tab
+//	{
+//		// Nothing for now
+//	}
+//	else if(index==2) // Position tab
+//	{
+//		// TODO? // Nothing currently
+//	}
+//	else if(index==3) // List tab
+//	{
+//		QModelIndex modelIndex = ui->completionLabel->getSelected();
+
+//		updateRecentSearchList(ui->completionLabel->getSelected());
+////		ui->objectTypeComboBox->itemData(index).toString();
+//	}
 }
 
 void SearchDialog::updateRecentSearchList(const QString &nameI18n)
@@ -897,6 +919,12 @@ void SearchDialog::updateRecentSearchList(const QString &nameI18n)
 	recentObjectSearchesData.recentList.removeDuplicates();
 
 	adjustRecentList(recentObjectSearchesData.maxSize);
+}
+
+void SearchDialog::updateRecentSearchList(const QModelIndex &modelIndex)
+{
+	updateRecentSearchList(proxyModel->data(modelIndex,
+						Qt::DisplayRole).toString());
 }
 
 void SearchDialog::adjustRecentList(int maxSize)
@@ -917,12 +945,6 @@ void SearchDialog::adjustRecentList(int maxSize)
 				recentObjectSearchesData.recentList.mid(0,
 									spinBoxMaxSize);
 	}
-}
-
-void SearchDialog::updateRecentSearchList(const QModelIndex &modelIndex)
-{
-	updateRecentSearchList(proxyModel->data(modelIndex,
-						Qt::DisplayRole).toString());
 }
 
 void SearchDialog::loadRecentSearches()
@@ -1203,6 +1225,7 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 
 void SearchDialog::gotoObject(const QModelIndex &modelIndex)
 {
+	updateRecentSearchList(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
 	gotoObject(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
 }
 
