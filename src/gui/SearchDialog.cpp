@@ -87,10 +87,10 @@ void CompletionLabel::appendValues(const QStringList& v)
 	updateText();
 }
 
-void CompletionLabel::clearValues()
+void CompletionLabel::clearValues() // TODO: rename?
 {
-	recentValues.clear();
-	values.clear();
+	// Default: Show recent values
+	values = recentValues;
 	selectedIdx=0;
 	updateText();
 }
@@ -147,7 +147,7 @@ void CompletionLabel::updateText()
 		else
 			newText+=tempValue;
 		if (i!=values.size()-1)
-			newText += ", ";
+			newText += "<br>";
 	}
 	setText(newText);
 }
@@ -472,6 +472,14 @@ void SearchDialog::createDialogContent()
 
 	// Get data from previous session
 	loadRecentSearches();
+	QStringList recentMatches = listMatchingRecentObjects("", recentObjectSearchesData.maxSize, false);
+
+	// TODO: move to function?
+	ui->completionLabel->appendValues(recentMatches);
+	ui->completionLabel->appendRecentValues(recentMatches);
+	ui->completionLabel->setValues(recentMatches, recentMatches);
+	ui->completionLabel->selectFirst();
+
 	connect(ui->recentSearchSizeSpinBox, SIGNAL(valueChanged(int)), this, SLOT(recentSearchSizeChanged()));
 	connect(ui->recentSearchSizeButtonBox, SIGNAL(accepted()), this, SLOT(recentSearchSizeAccepted()));
 	connect(ui->recentSearchSizeButtonBox, SIGNAL(rejected()), this, SLOT(recentSearchSizeRejected()));
@@ -580,6 +588,8 @@ void SearchDialog::recentSearchSizeAccepted()
 	// Update max size in dialog and user data
 	int maxSize = ui->recentSearchSizeSpinBox->value();
 	setRecentSearchSize(maxSize);
+
+	// TODO: Update default list when max size change
 
 	// Return font to normal
 	ui->recentSearchSizeSpinBox->setStyleSheet("background-color:gray");
@@ -754,7 +764,15 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 	QString trimmedText = text.trimmed().toLower();
 	if (trimmedText.isEmpty()) {
 		ui->completionLabel->clearValues();
+
+		QStringList recentMatches = listMatchingRecentObjects("", recentObjectSearchesData.maxSize, false);
+
+		// TODO: move to function?
+		ui->completionLabel->appendValues(recentMatches);
+		ui->completionLabel->appendRecentValues(recentMatches);
+		ui->completionLabel->setValues(recentMatches, recentMatches);
 		ui->completionLabel->selectFirst();
+
 		ui->simbadStatusLabel->setText("");
 		ui->simbadCooStatusLabel->setText("");
 		ui->pushButtonGotoSearchSkyObject->setEnabled(false);
@@ -816,7 +834,7 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 								  false);
 			matches += objectMgr->listMatchingObjects(greekText,
 								  (greekTextMaxMbItem - matches.size()),
-								  useStartOfWords, true);
+						  useStartOfWords, true);
 		}
 		else
 		{
@@ -869,9 +887,9 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		allMatches.removeDuplicates();
 
 		// Updates values
+		// TODO: move to function?
 		ui->completionLabel->appendValues(allMatches);
 		ui->completionLabel->appendRecentValues(recentMatches);
-
 		ui->completionLabel->setValues(allMatches, recentMatches);
 		ui->completionLabel->selectFirst();
 
@@ -883,28 +901,6 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 void SearchDialog::updateRecentSearchList()
 {
 	updateRecentSearchList(ui->completionLabel->getSelected());
-//	int index =  ui->tabWidget->currentIndex();
-
-//	// Update depends on current tab
-//	if(index == 0) // Object tab
-//	{
-//		updateRecentSearchList(ui->completionLabel->getSelected());
-//	}
-//	else if(index == 1) // SIMBAD tab
-//	{
-//		// Nothing for now
-//	}
-//	else if(index==2) // Position tab
-//	{
-//		// TODO? // Nothing currently
-//	}
-//	else if(index==3) // List tab
-//	{
-//		QModelIndex modelIndex = ui->completionLabel->getSelected();
-
-//		updateRecentSearchList(ui->completionLabel->getSelected());
-////		ui->objectTypeComboBox->itemData(index).toString();
-//	}
 }
 
 void SearchDialog::updateRecentSearchList(const QString &nameI18n)
