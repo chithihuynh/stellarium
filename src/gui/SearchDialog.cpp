@@ -19,7 +19,7 @@
 
 #include "Dialog.hpp"
 #include "SearchDialog.hpp"
-#include "ui_searchDialogGui.h"
+#include "ui_searchDialogGui.h" // TODO_CH: enable writable bookmark.ui
 #include "StelApp.hpp"
 #include "StelCore.hpp"
 #include "StelModuleMgr.hpp"
@@ -57,7 +57,6 @@
 #include <QDir>
 #include <QSet>
 #include <QDialog>
-
 #include "SimbadSearcher.hpp"
 
 // Start of members for class CompletionLabel
@@ -87,7 +86,7 @@ void CompletionLabel::appendValues(const QStringList& v)
 	updateText();
 }
 
-void CompletionLabel::clearValues() // TODO: rename?
+void CompletionLabel::clearValues() // TODO_CH: rename?
 {
 	// Default: Show recent values
 	values = recentValues;
@@ -472,13 +471,11 @@ void SearchDialog::createDialogContent()
 
 	// Get data from previous session
 	loadRecentSearches();
-	QStringList recentMatches = listMatchingRecentObjects("", recentObjectSearchesData.maxSize, false);
 
-	// TODO: move to function?
-	ui->completionLabel->appendValues(recentMatches);
-	ui->completionLabel->appendRecentValues(recentMatches);
-	ui->completionLabel->setValues(recentMatches, recentMatches);
-	ui->completionLabel->selectFirst();
+	// Auto display recent searches
+	QStringList recentMatches = listMatchingRecentObjects("", recentObjectSearchesData.maxSize, false);
+	appendAndSetCompletionLabel(recentMatches, recentMatches);
+	setPushButtonGotoSearch();
 
 	connect(ui->recentSearchSizeSpinBox, SIGNAL(valueChanged(int)), this, SLOT(recentSearchSizeChanged()));
 	connect(ui->recentSearchSizeButtonBox, SIGNAL(accepted()), this, SLOT(recentSearchSizeAccepted()));
@@ -503,10 +500,12 @@ void SearchDialog::recentSearchSizeChanged()
 
 void SearchDialog::changeTab(int index)
 {
-	if (index==0) // Search Tab
+	QString changeTabText = ui->tabWidget->tabText(index);
+
+	if (changeTabText == "Object") // Search Tab
 		ui->lineEditSearchSkyObject->setFocus();
 
-	if (index==2) // Position
+	if (changeTabText=="Position") // Position
 	{
 		if (useFOVCenterMarker)
 			GETSTELMODULE(SpecialMarkersMgr)->setFlagFOVCenterMarker(true);
@@ -514,7 +513,7 @@ void SearchDialog::changeTab(int index)
 	else
 		GETSTELMODULE(SpecialMarkersMgr)->setFlagFOVCenterMarker(fovCenterMarkerState);
 
-	if (index==3) // Lists
+	if (changeTabText=="Lists") // Lists
 	{
 		updateListTab();
 		ui->searchInListLineEdit->setFocus();
@@ -589,7 +588,7 @@ void SearchDialog::recentSearchSizeAccepted()
 	int maxSize = ui->recentSearchSizeSpinBox->value();
 	setRecentSearchSize(maxSize);
 
-	// TODO: Update default list when max size change
+	// TODO_CH: Update default list when max size change
 
 	// Return font to normal
 	ui->recentSearchSizeSpinBox->setStyleSheet("background-color:gray");
@@ -767,7 +766,7 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 
 		QStringList recentMatches = listMatchingRecentObjects("", recentObjectSearchesData.maxSize, false);
 
-		// TODO: move to function?
+		// TODO_CH: move to function?
 		ui->completionLabel->appendValues(recentMatches);
 		ui->completionLabel->appendRecentValues(recentMatches);
 		ui->completionLabel->setValues(recentMatches, recentMatches);
@@ -775,7 +774,7 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 
 		ui->simbadStatusLabel->setText("");
 		ui->simbadCooStatusLabel->setText("");
-		ui->pushButtonGotoSearchSkyObject->setEnabled(false);
+		setPushButtonGotoSearch();
 	} else {
 		if (useSimbad)
 		{
@@ -784,8 +783,6 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 			connect(simbadReply, SIGNAL(statusChanged()), this, SLOT(onSimbadStatusChanged()));
 		}
 
-		QString greekText = substituteGreek(trimmedText);
-
 		// Get possible objects
 		QStringList matches;
 		QStringList recentMatches;
@@ -793,10 +790,8 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 
 		// Use to adjust matches to be within range of maxNbItem
 		int maxNbItem;
-		int tempSize;
-		QStringList tempMatches; // unsorted matches use for calculation
-		// not displaying
 
+		QString greekText = substituteGreek(trimmedText);
 		if(greekText != trimmedText)
 		{
 			int trimmedTextMaxNbItem = 8;
@@ -856,45 +851,14 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 								  useStartOfWords, true);
 		}
 
-		// remove possible duplicates from completion list
-		matches.removeDuplicates();
-
-		matches.sort(Qt::CaseInsensitive);
-		// objects with short names should be searched first
-		// examples: Moon, Hydra (moon); Jupiter, Ghost of Jupiter
-		stringLengthCompare comparator;
-		std::sort(matches.begin(), matches.end(), comparator);
-
-		// Adjust recent matches to prefered max size
-		recentMatches = recentMatches.mid(0, recentObjectSearchesData.maxSize);
-
-		// Find total size of both matches
-		tempMatches << recentMatches << matches; // unsorted
-		tempMatches.removeDuplicates();
-		tempSize = tempMatches.size();
-
-		// Adjust match size to be within range
-		if(tempSize>maxNbItem)
-		{
-			int i = tempSize - maxNbItem;
-			matches = matches.mid(0, matches.size() - i);
-		}
-
-		// Combine list: ordered by recent searches then relevance
-		allMatches << recentMatches << matches;
-
-		// Remove possible duplicates from both list
-		allMatches.removeDuplicates();
+		// Clean up matches
+		adjustMatchesResult(allMatches, recentMatches, matches, maxNbItem);
 
 		// Updates values
-		// TODO: move to function?
-		ui->completionLabel->appendValues(allMatches);
-		ui->completionLabel->appendRecentValues(recentMatches);
-		ui->completionLabel->setValues(allMatches, recentMatches);
-		ui->completionLabel->selectFirst();
+		appendAndSetCompletionLabel(allMatches, recentMatches);
 
 		// Update push button enabled state
-		ui->pushButtonGotoSearchSkyObject->setEnabled(true);
+		setPushButtonGotoSearch();
 	}
 }
 
@@ -940,6 +904,71 @@ void SearchDialog::adjustRecentList(int maxSize)
 		recentObjectSearchesData.recentList =
 				recentObjectSearchesData.recentList.mid(0,
 									spinBoxMaxSize);
+	}
+}
+
+void SearchDialog::adjustMatchesResult(QStringList &allMatches, QStringList& recentMatches, QStringList& matches, int maxNbItem)
+{
+	int tempSize;
+	QStringList tempMatches; // unsorted matches use for calculation
+	// not displaying
+
+	// remove possible duplicates from completion list
+	matches.removeDuplicates();
+
+	matches.sort(Qt::CaseInsensitive);
+	// objects with short names should be searched first
+	// examples: Moon, Hydra (moon); Jupiter, Ghost of Jupiter
+	stringLengthCompare comparator;
+	std::sort(matches.begin(), matches.end(), comparator);
+
+	// Adjust recent matches to prefered max size
+	recentMatches = recentMatches.mid(0, recentObjectSearchesData.maxSize);
+
+	// Find total size of both matches
+	tempMatches << recentMatches << matches; // unsorted
+	tempMatches.removeDuplicates();
+	tempSize = tempMatches.size();
+
+	// Adjust match size to be within range
+	if(tempSize>maxNbItem)
+	{
+		int i = tempSize - maxNbItem;
+		matches = matches.mid(0, matches.size() - i);
+	}
+
+	// Combine list: ordered by recent searches then relevance
+	allMatches << recentMatches << matches;
+
+	// Remove possible duplicates from both listQSt
+	allMatches.removeDuplicates();
+}
+
+
+void SearchDialog::appendAndSetCompletionLabel(QStringList allMatches,
+					       QStringList recentMatches)
+{
+	// Updates values
+	ui->completionLabel->appendValues(allMatches);
+	ui->completionLabel->appendRecentValues(recentMatches);
+
+	// Update display
+	ui->completionLabel->setValues(allMatches, recentMatches);
+	ui->completionLabel->selectFirst();
+}
+
+void SearchDialog::setPushButtonGotoSearch()
+{
+	// Empty search and empty recently search object list
+	if (ui->completionLabel->isEmpty() && (recentObjectSearchesData.recentList.size() == 0))
+	{
+		// Do not enable search button
+		ui->pushButtonGotoSearchSkyObject->setEnabled(false);
+	}
+	else
+	{
+		// Do enable search  button
+		ui->pushButtonGotoSearchSkyObject->setEnabled(true);
 	}
 }
 
@@ -1081,8 +1110,7 @@ void SearchDialog::onSimbadStatusChanged()
 			ui->simbadCooStatusLabel->setText(info);
 		else
 			ui->simbadStatusLabel->setText(info);
-		if (ui->completionLabel->isEmpty())
-			ui->pushButtonGotoSearchSkyObject->setEnabled(false);
+		setPushButtonGotoSearch();
 		ui->simbadCooResultsTextBrowser->clear();
 	}
 	else
@@ -1101,7 +1129,7 @@ void SearchDialog::onSimbadStatusChanged()
 		simbadResults = simbadReply->getResults();
 		ui->completionLabel->appendValues(simbadResults.keys());
 		// Update push button enabled state
-		ui->pushButtonGotoSearchSkyObject->setEnabled(!ui->completionLabel->isEmpty());
+		setPushButtonGotoSearch();
 	}
 
 	if (simbadReply->getCurrentStatus()==SimbadLookupReply::SimbadCoordinateLookupFinished)
@@ -1117,7 +1145,7 @@ void SearchDialog::onSimbadStatusChanged()
 		simbadReply=Q_NULLPTR;
 
 		// Update push button enabled state
-		ui->pushButtonGotoSearchSkyObject->setEnabled(!ui->completionLabel->isEmpty());
+		setPushButtonGotoSearch();
 	}
 }
 

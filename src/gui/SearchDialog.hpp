@@ -134,6 +134,7 @@ signals:
 	void simbadGetsTypesChanged(bool b);
 	void simbadGetsDimsChanged(bool b);
 
+
 public slots:
 	void retranslate();
 	//! This style only displays the text search field and the search button
@@ -334,6 +335,12 @@ private:
 	void saveRecentSearches();
 	//! Shrink list if needed
 	void adjustRecentList(int maxSize);
+	//! Display search per user preference
+	void adjustMatchesResult(QStringList &allMatches, QStringList& recentMatches, QStringList& matches, int maxNbItem);
+	//! Update searches result display
+	void appendAndSetCompletionLabel(QStringList allMatches, QStringList recentMatches);
+	//! Decide push button enable state
+	void setPushButtonGotoSearch();
 
 public:
 	static QString extSearchText;
