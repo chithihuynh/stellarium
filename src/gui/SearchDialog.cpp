@@ -19,7 +19,7 @@
 
 #include "Dialog.hpp"
 #include "SearchDialog.hpp"
-#include "ui_searchDialogGui.h" // TODO_CH: enable writable bookmark.ui
+#include "ui_searchDialogGui.h"
 #include "StelApp.hpp"
 #include "StelCore.hpp"
 #include "StelModuleMgr.hpp"
@@ -86,7 +86,7 @@ void CompletionLabel::appendValues(const QStringList& v)
 	updateText();
 }
 
-void CompletionLabel::clearValues() // TODO_CH: rename?
+void CompletionLabel::clearValues()
 {
 	// Default: Show recent values
 	values = recentValues;
@@ -361,7 +361,7 @@ void SearchDialog::createDialogContent()
 	connect(GETSTELMODULE(StelObjectMgr), SIGNAL(selectedObjectChanged(StelModule::StelModuleSelectAction)), this, SLOT(clearSimbadText(StelModule::StelModuleSelectAction)));
 	connect(ui->pushButtonGotoSearchSkyObject, SIGNAL(clicked()), this, SLOT(gotoObject()));
 	onSearchTextChanged(ui->lineEditSearchSkyObject->text());
-	connect(ui->lineEditSearchSkyObject, SIGNAL(returnPressed()), this, SLOT(gotoObject()));
+	connect(ui->lineEditSearchSkyObject, SIGNAL(returnPressed()), this, SLOT(gotoObject())); // TODO_CH HELPFUL
 	connect(ui->lineEditSearchSkyObject, SIGNAL(selectionChanged()), this, SLOT(setHasSelectedFlag()));
 	connect(ui->lineEditSearchSkyObject, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showContextMenu(QPoint)));
 
@@ -460,8 +460,7 @@ void SearchDialog::createDialogContent()
 	updateListTab();
 
 	connect(ui->tabWidget, SIGNAL(currentChanged(int)), this, SLOT(changeTab(int)));
-	// Set the focus directly on the line edit
-	if (ui->tabWidget->currentIndex()==0)
+	// Set the focus directly on the line editDe	if (ui->tabWidget->currentIndex()==0)
 		ui->lineEditSearchSkyObject->setFocus();
 
 	QString style = "QLabel { color: rgb(238, 238, 238); }";
@@ -473,13 +472,21 @@ void SearchDialog::createDialogContent()
 	loadRecentSearches();
 
 	// Auto display recent searches
-	QStringList recentMatches = listMatchingRecentObjects("", recentObjectSearchesData.maxSize, false);
-	appendAndSetCompletionLabel(recentMatches, recentMatches);
+	QStringList recentMatches = listMatchingRecentObjects(ui->lineEditSearchSkyObject->text(),
+							      recentObjectSearchesData.maxSize,
+							      useStartOfWords);
+	resetSearchResultDisplay(recentMatches, recentMatches);
 	setPushButtonGotoSearch();
 
 	connect(ui->recentSearchSizeSpinBox, SIGNAL(valueChanged(int)), this, SLOT(recentSearchSizeChanged()));
-	connect(ui->recentSearchSizeButtonBox, SIGNAL(accepted()), this, SLOT(recentSearchSizeAccepted()));
-	connect(ui->recentSearchSizeButtonBox, SIGNAL(rejected()), this, SLOT(recentSearchSizeRejected()));
+	connect(ui->recentSearchSizeButtonBox, SIGNAL(accepted()), this, SLOT(recentSearchSizeApply()));
+	connect(ui->recentSearchSizeButtonBox, SIGNAL(rejected()), this, SLOT(recentSearchSizeReset()));
+
+	QString toolTipComment = QString("Default:%1 | Range: %2 - %3")
+			.arg(defaultMaxSize)
+			.arg(ui->recentSearchSizeSpinBox->minimum())
+			.arg( ui->recentSearchSizeSpinBox->maximum());
+	ui->recentSearchSizeSpinBox->setToolTip(toolTipComment);
 }
 
 void SearchDialog::recentSearchSizeChanged()
@@ -582,20 +589,45 @@ void SearchDialog::setSimbadGetsDims(bool b)
 	emit simbadGetsDimsChanged(b);
 }
 
-void SearchDialog::recentSearchSizeAccepted()
+void SearchDialog::recentSearchSizeApply() // TODO_CH: ENTER = OK
 {
 	// Update max size in dialog and user data
 	int maxSize = ui->recentSearchSizeSpinBox->value();
 	setRecentSearchSize(maxSize);
-
-	// TODO_CH: Update default list when max size change
+	maxSize = recentObjectSearchesData.maxSize; // Might not be the same
 
 	// Return font to normal
 	ui->recentSearchSizeSpinBox->setStyleSheet("background-color:gray");
 	ui->recentSearchSizeSpinBox->show();
+
+	// Get maches
+	QStringList allMatches;
+	QStringList recentMatches;
+	QStringList matches;
+	int maxNbItem;
+
+	recentMatches = listMatchingRecentObjects(ui->lineEditSearchSkyObject->text(),
+						  maxSize,
+						  useStartOfWords);
+	matches = ui->completionLabel->getValues();
+
+	// Remove all objects from recentValues (to get value of maxNbItem)
+	QStringList recentValues = ui->completionLabel->getRecentValues();
+	for(int i = 0; i < recentValues.size(); i++)
+	{
+		matches.removeAll(recentValues[i]);
+	}
+
+	// Calcuation based on the disjunction between the two matches
+	maxNbItem = recentMatches.size() + matches.size();
+
+	// Update displayed recent values per new maxSize
+	adjustMatchesResult(allMatches, recentMatches, matches, maxNbItem);
+	resetSearchResultDisplay(allMatches, recentMatches);
+	setPushButtonGotoSearch();
 }
 
-void SearchDialog::recentSearchSizeRejected()
+void SearchDialog::recentSearchSizeReset()// TODO_CH: Esc = Cancel
 {
 	// Reset to previous value
 	ui->recentSearchSizeSpinBox->setValue(recentObjectSearchesData.maxSize);
@@ -760,17 +792,18 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		simbadResults.clear();
 	}
 
+	// Use to adjust matches to be within range of maxNbItem
+	int maxNbItem;
 	QString trimmedText = text.trimmed().toLower();
 	if (trimmedText.isEmpty()) {
 		ui->completionLabel->clearValues();
 
-		QStringList recentMatches = listMatchingRecentObjects("", recentObjectSearchesData.maxSize, false);
-
-		// TODO_CH: move to function?
-		ui->completionLabel->appendValues(recentMatches);
-		ui->completionLabel->appendRecentValues(recentMatches);
-		ui->completionLabel->setValues(recentMatches, recentMatches);
-		ui->completionLabel->selectFirst();
+		maxNbItem = qMax(defaultMaxSize, recentObjectSearchesData.maxSize);
+		// Auto display recent searches
+		QStringList recentMatches = listMatchingRecentObjects(trimmedText,
+								      maxNbItem,
+								      useStartOfWords);
+		resetSearchResultDisplay(recentMatches, recentMatches);
 
 		ui->simbadStatusLabel->setText("");
 		ui->simbadCooStatusLabel->setText("");
@@ -787,9 +820,6 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		QStringList matches;
 		QStringList recentMatches;
 		QStringList allMatches;
-
-		// Use to adjust matches to be within range of maxNbItem
-		int maxNbItem;
 
 		QString greekText = substituteGreek(trimmedText);
 		if(greekText != trimmedText)
@@ -855,7 +885,7 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		adjustMatchesResult(allMatches, recentMatches, matches, maxNbItem);
 
 		// Updates values
-		appendAndSetCompletionLabel(allMatches, recentMatches);
+		resetSearchResultDisplay(allMatches, recentMatches);
 
 		// Update push button enabled state
 		setPushButtonGotoSearch();
@@ -945,7 +975,7 @@ void SearchDialog::adjustMatchesResult(QStringList &allMatches, QStringList& rec
 }
 
 
-void SearchDialog::appendAndSetCompletionLabel(QStringList allMatches,
+void SearchDialog::resetSearchResultDisplay(QStringList allMatches,
 					       QStringList recentMatches)
 {
 	// Updates values
@@ -1042,7 +1072,9 @@ void SearchDialog::saveRecentSearches()
 	jsonFile.close();
 }
 
-QStringList SearchDialog::listMatchingRecentObjects(const QString& objPrefix, int maxNbItem, bool useStartOfWords) const
+QStringList SearchDialog::listMatchingRecentObjects(const QString& objPrefix,
+						    int maxNbItem,
+						    bool useStartOfWords) const
 {
 	QStringList result;
 
