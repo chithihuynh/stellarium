@@ -59,49 +59,58 @@
 #include <QDialog>
 #include "SimbadSearcher.hpp"
 
-// Start of members for class CompletionLabel
-CompletionLabel::CompletionLabel(QWidget* parent) : QLabel(parent), selectedIdx(0)
+// Start of members for class CompletionListModel
+CompletionListModel::CompletionListModel(QObject* parent):
+	QStringListModel(parent),
+	selectedIdx(0)
 {
 }
 
-CompletionLabel::~CompletionLabel()
+CompletionListModel::CompletionListModel(const QStringList &string, QObject* parent):
+	QStringListModel(string, parent),
+	selectedIdx(0)
 {
 }
 
-void CompletionLabel::setValues(const QStringList& v, const QStringList& rv)
+CompletionListModel::~CompletionListModel()
+{
+}
+
+void CompletionListModel::setValues(const QStringList& v, const QStringList& rv)
 {
 	values=v;
 	recentValues=rv;
 	updateText();
 }
 
-void CompletionLabel::appendRecentValues(const QStringList& v)
+void CompletionListModel::appendRecentValues(const QStringList& v)
 {
 	recentValues+=v;
 }
 
-void CompletionLabel::appendValues(const QStringList& v)
+void CompletionListModel::appendValues(const QStringList& v)
 {
 	values+=v;
 	updateText();
 }
 
-void CompletionLabel::clearValues()
+void CompletionListModel::clearValues()
 {
 	// Default: Show recent values
+	values.clear();
 	values = recentValues;
 	selectedIdx=0;
 	updateText();
 }
 
-QString CompletionLabel::getSelected() const
+QString CompletionListModel::getSelected() const
 {
 	if (values.isEmpty())
 		return QString();
 	return values.at(selectedIdx);
 }
 
-void CompletionLabel::selectNext()
+void CompletionListModel::selectNext()
 {
 	++selectedIdx;
 	if (selectedIdx>=values.size())
@@ -109,7 +118,7 @@ void CompletionLabel::selectNext()
 	updateText();
 }
 
-void CompletionLabel::selectPrevious()
+void CompletionListModel::selectPrevious()
 {
 	--selectedIdx;
 	if (selectedIdx<0)
@@ -117,38 +126,33 @@ void CompletionLabel::selectPrevious()
 	updateText();
 }
 
-void CompletionLabel::selectFirst()
+void CompletionListModel::selectFirst()
 {
 	selectedIdx=0;
 	updateText();
 }
 
-void CompletionLabel::updateText()
+void CompletionListModel::updateText()
 {
-	QString newText;
-	QString tempValue;
+	this->setStringList(values);
+}
 
-//	// Regenerate the list with the selected item in bold and/or italicized
-//	// recent items
-	for (int i=0;i<values.size();++i)
+QVariant CompletionListModel::data(const QModelIndex &index, int role) const
+{
+	if (!index.isValid())
+	    return QVariant();
+
+	// Bold recent objects
+	if(role == Qt::FontRole)
 	{
-		tempValue = values[i]; // Prevent change to orginial value
-
-		// Italicized recent values
-		if(recentValues.contains(tempValue))
-		{
-			tempValue="<i>"+tempValue+"</i>";
-		}
-
-		// Bold selected item
-		if (i==selectedIdx)
-			newText+="<b>"+tempValue+"</b>";
-		else
-			newText+=tempValue;
-		if (i!=values.size()-1)
-			newText += "<br>";
+	    QFont font;
+	    bool toBold = recentValues.contains(index.data(Qt::DisplayRole).toString()) ?
+				    true : false;
+	    font.setBold(toBold);
+	    return font;
 	}
-	setText(newText);
+
+	return QStringListModel::data(index, role);
 }
 
 // Start of members for class SearchDialog
@@ -471,8 +475,13 @@ void SearchDialog::createDialogContent()
 	// Get data from previous session
 	loadRecentSearches();
 
+	// Create list model view
+//	searchListModel = new CompletionListModel();
+	ui->searchListView->setModel(searchListModel);
+	searchListModel->setStringList(searchListModel->getValues());
+
 	// Auto display recent searches
-	QStringList recentMatches = listMatchingRecentObjects(ui->lineEditSearchSkyObject->text(),
+	QStringList recentMatches = listMatchingRecentObjects("",
 							      recentObjectSearchesData.maxSize,
 							      useStartOfWords);
 	resetSearchResultDisplay(recentMatches, recentMatches);
@@ -609,10 +618,10 @@ void SearchDialog::recentSearchSizeApply() // TODO_CH: ENTER = OK
 	recentMatches = listMatchingRecentObjects(ui->lineEditSearchSkyObject->text(),
 						  maxSize,
 						  useStartOfWords);
-	matches = ui->completionLabel->getValues();
+	matches = searchListModel->getValues();
 
 	// Remove all objects from recentValues (to get value of maxNbItem)
-	QStringList recentValues = ui->completionLabel->getRecentValues();
+	QStringList recentValues = searchListModel->getRecentValues();
 	for(int i = 0; i < recentValues.size(); i++)
 	{
 		matches.removeAll(recentValues[i]);
@@ -671,7 +680,7 @@ void SearchDialog::setSimpleStyle()
 
 void SearchDialog::manualPositionChanged()
 {
-	ui->completionLabel->clearValues();
+	searchListModel->clearValues();
 	StelCore* core = StelApp::getInstance().getCore();
 	StelMovementMgr* mvmgr = GETSTELMODULE(StelMovementMgr);	
 	Vec3d pos;
@@ -796,7 +805,7 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 	int maxNbItem;
 	QString trimmedText = text.trimmed().toLower();
 	if (trimmedText.isEmpty()) {
-		ui->completionLabel->clearValues();
+		searchListModel->clearValues();
 
 		maxNbItem = qMax(defaultMaxSize, recentObjectSearchesData.maxSize);
 		// Auto display recent searches
@@ -894,7 +903,7 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 
 void SearchDialog::updateRecentSearchList()
 {
-	updateRecentSearchList(ui->completionLabel->getSelected());
+	updateRecentSearchList(searchListModel->getSelected());
 }
 
 void SearchDialog::updateRecentSearchList(const QString &nameI18n)
@@ -979,18 +988,23 @@ void SearchDialog::resetSearchResultDisplay(QStringList allMatches,
 					       QStringList recentMatches)
 {
 	// Updates values
-	ui->completionLabel->appendValues(allMatches);
-	ui->completionLabel->appendRecentValues(recentMatches);
+	searchListModel->appendValues(allMatches);
+	searchListModel->appendRecentValues(recentMatches);
 
 	// Update display
-	ui->completionLabel->setValues(allMatches, recentMatches);
-	ui->completionLabel->selectFirst();
+	searchListModel->setValues(allMatches, recentMatches);
+	searchListModel->selectFirst();
+
+	// Update highlight to top
+	ui->searchListView->scrollToTop();
+	int row = searchListModel->getSelectedIdx();
+	ui->searchListView->setCurrentIndex(searchListModel->index(row));
 }
 
 void SearchDialog::setPushButtonGotoSearch()
 {
 	// Empty search and empty recently search object list
-	if (ui->completionLabel->isEmpty() && (recentObjectSearchesData.recentList.size() == 0))
+	if (searchListModel->isEmpty() && (recentObjectSearchesData.recentList.size() == 0))
 	{
 		// Do not enable search button
 		ui->pushButtonGotoSearchSkyObject->setEnabled(false);
@@ -1159,7 +1173,7 @@ void SearchDialog::onSimbadStatusChanged()
 	if (simbadReply->getCurrentStatus()==SimbadLookupReply::SimbadLookupFinished)
 	{
 		simbadResults = simbadReply->getResults();
-		ui->completionLabel->appendValues(simbadResults.keys());
+		searchListModel->appendValues(simbadResults.keys());
 		// Update push button enabled state
 		setPushButtonGotoSearch();
 	}
@@ -1199,7 +1213,7 @@ void SearchDialog::greekLetterClicked()
 
 void SearchDialog::gotoObject()
 {
-	gotoObject(ui->completionLabel->getSelected());
+	gotoObject(searchListModel->getSelected());
 }
 
 void SearchDialog::gotoObject(const QString &nameI18n)
@@ -1221,7 +1235,7 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 			{
 				close();
 				ui->lineEditSearchSkyObject->setText(""); // https://wiki.qt.io/Technical_FAQ#Why_does_the_memory_keep_increasing_when_repeatedly_pasting_text_and_calling_clear.28.29_in_a_QLineEdit.3F
-				ui->completionLabel->clearValues();
+				searchListModel->clearValues();
 				// Can't point to home planet
 				if (newSelected[0]->getEnglishName()!=StelApp::getInstance().getCore()->getCurrentLocation().planetName)
 				{
@@ -1239,7 +1253,7 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 			close();
 			GETSTELMODULE(CustomObjectMgr)->addCustomObject(nameI18n, simbadResults[nameI18n]);
 			ui->lineEditSearchSkyObject->clear();
-			ui->completionLabel->clearValues();
+			searchListModel->clearValues();
 			if (objectMgr->findAndSelect(nameI18n))
 			{
 				const QList<StelObjectP> newSelected = objectMgr->getSelectedObject();
@@ -1263,7 +1277,7 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 		{
 			close();
 			ui->lineEditSearchSkyObject->clear();
-			ui->completionLabel->clearValues();
+			searchListModel->clearValues();
 			// Can't point to home planet
 			if (newSelected[0]->getEnglishName()!=StelApp::getInstance().getCore()->getCurrentLocation().planetName)
 			{
@@ -1298,13 +1312,19 @@ bool SearchDialog::eventFilter(QObject*, QEvent *event)
 
 		if (keyEvent->key() == Qt::Key_Tab || keyEvent->key() == Qt::Key_Down)
 		{
-			ui->completionLabel->selectNext();
+			searchListModel->selectNext();
+			int row = searchListModel->getSelectedIdx();
+			ui->searchListView->scrollTo(searchListModel->index(row));
+			ui->searchListView->setCurrentIndex(searchListModel->index(row));
 			event->accept();
 			return true;
 		}
 		if (keyEvent->key() == Qt::Key_Up)
 		{
-			ui->completionLabel->selectPrevious();
+			searchListModel->selectPrevious();
+			int row = searchListModel->getSelectedIdx();
+			ui->searchListView->scrollTo(searchListModel->index(row));
+			ui->searchListView->setCurrentIndex(searchListModel->index(row));
 			event->accept();
 			return true;
 		}

@@ -21,7 +21,9 @@
 #define SEARCHDIALOG_HPP
 
 #include <QObject>
-#include <QLabel>
+#include <QStringListModel>
+#include <QStandardItemModel>
+#include <QFont>
 #include <QMap>
 #include <QHash>
 #include <QDialog>
@@ -48,16 +50,17 @@ struct recentObjectSearches
 };
 Q_DECLARE_METATYPE(recentObjectSearches)
 
-//! @class CompletionLabel
+//! @class CompletionListModel
 //! Display a list of results matching the search string, and allow to
 //! tab through those selections.
-class CompletionLabel : public QLabel
+class CompletionListModel : public QStringListModel
 {
 	Q_OBJECT
 
 public:
-	CompletionLabel(QWidget* parent=Q_NULLPTR);
-	~CompletionLabel();
+	CompletionListModel(QObject* parent=Q_NULLPTR); // TODO_CH: Ref QObject* parent
+	CompletionListModel(const QStringList & strings, QObject* parent =Q_NULLPTR);
+	~CompletionListModel();
 
 	QString getSelected(void) const;
 	void setValues(const QStringList&, const QStringList&);
@@ -67,6 +70,10 @@ public:
 	void clearValues();
 	QStringList getValues(void) { return values; };
 	QStringList getRecentValues(void) { return recentValues; };
+	int getSelectedIdx() { return selectedIdx; }
+
+	// Bold recent objects
+	QVariant data(const QModelIndex &index, int role) const;
 
 public slots:
 	void selectNext();
@@ -322,6 +329,7 @@ private:
 	CoordinateSystem currentCoordinateSystem;
 
 	// Properties for "recent object searches"
+	CompletionListModel* searchListModel = new CompletionListModel(); // TODO_CH: old = ui->completionLabel
 	recentObjectSearches recentObjectSearchesData;
 	QString recentObjectSearchesJsonPath;
 
