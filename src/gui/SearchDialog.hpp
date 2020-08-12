@@ -329,15 +329,12 @@ private:
 	CoordinateSystem currentCoordinateSystem;
 
 	// Properties for "recent object searches"
-	CompletionListModel* searchListModel = new CompletionListModel(); // TODO_CH: old = ui->completionLabel
+	CompletionListModel* searchListModel;
 	recentObjectSearches recentObjectSearchesData;
 	QString recentObjectSearchesJsonPath;
 
-	//! Adds object to "recent search list" (called from gotoObject...)
-	void updateRecentSearchList();
-	void updateRecentSearchList(const QString &nameI18n); // Might not need
-	//! for going from list views
-	void updateRecentSearchList(const QModelIndex &modelIndex); // Might not need
+	//! Add to list: called from gotoObject(const QString& nameI18n)
+	void updateRecentSearchList(const QString &nameI18n);
 
 	//! Get data from previous session
 	void loadRecentSearches();

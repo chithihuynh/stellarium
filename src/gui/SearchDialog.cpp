@@ -57,6 +57,7 @@
 #include <QDir>
 #include <QSet>
 #include <QDialog>
+#include <QAbstractItemModel>
 #include "SimbadSearcher.hpp"
 
 // Start of members for class CompletionListModel
@@ -191,6 +192,9 @@ SearchDialog::SearchDialog(QObject* parent)
 	setSimbadGetsMorpho(conf->value("search/simbad_query_morpho",     false).toBool());
 	setSimbadGetsTypes( conf->value("search/simbad_query_types",      false).toBool());
 	setSimbadGetsDims(  conf->value("search/simbad_query_dimensions", false).toBool());
+
+	// Init CompletionListModel
+	searchListModel = new CompletionListModel();
 
 	// Find recent object search data file
 	recentObjectSearchesJsonPath = StelFileMgr::findFile("data",
@@ -476,9 +480,9 @@ void SearchDialog::createDialogContent()
 	loadRecentSearches();
 
 	// Create list model view
-//	searchListModel = new CompletionListModel();
 	ui->searchListView->setModel(searchListModel);
 	searchListModel->setStringList(searchListModel->getValues());
+
 
 	// Auto display recent searches
 	QStringList recentMatches = listMatchingRecentObjects("",
@@ -899,11 +903,13 @@ void SearchDialog::onSearchTextChanged(const QString& text)
 		// Update push button enabled state
 		setPushButtonGotoSearch();
 	}
-}
 
-void SearchDialog::updateRecentSearchList()
-{
-	updateRecentSearchList(searchListModel->getSelected());
+	// Goto object when clicking in list
+	connect(ui->searchListView, SIGNAL(clicked(const QModelIndex&)),
+		this, SLOT(gotoObject(const QModelIndex&)));
+	connect(ui->searchListView, SIGNAL(activated(const QModelIndex&)),
+		this, SLOT(gotoObject(const QModelIndex&)));
+
 }
 
 void SearchDialog::updateRecentSearchList(const QString &nameI18n)
@@ -918,12 +924,12 @@ void SearchDialog::updateRecentSearchList(const QString &nameI18n)
 	recentObjectSearchesData.recentList.removeDuplicates();
 
 	adjustRecentList(recentObjectSearchesData.maxSize);
-}
 
-void SearchDialog::updateRecentSearchList(const QModelIndex &modelIndex)
-{
-	updateRecentSearchList(proxyModel->data(modelIndex,
-						Qt::DisplayRole).toString());
+	// Auto display recent searches
+	QStringList recentMatches = listMatchingRecentObjects("",
+							      recentObjectSearchesData.maxSize,
+							      useStartOfWords);
+	resetSearchResultDisplay(recentMatches, recentMatches);
 }
 
 void SearchDialog::adjustRecentList(int maxSize)
@@ -1221,8 +1227,8 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 	if (nameI18n.isEmpty())
 		return;
 
-	// Update and save recent search list
-	updateRecentSearchList();
+	// Save recent search list
+	updateRecentSearchList(nameI18n);
 	saveRecentSearches();
 
 	StelMovementMgr* mvmgr = GETSTELMODULE(StelMovementMgr);
@@ -1235,7 +1241,6 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 			{
 				close();
 				ui->lineEditSearchSkyObject->setText(""); // https://wiki.qt.io/Technical_FAQ#Why_does_the_memory_keep_increasing_when_repeatedly_pasting_text_and_calling_clear.28.29_in_a_QLineEdit.3F
-				searchListModel->clearValues();
 				// Can't point to home planet
 				if (newSelected[0]->getEnglishName()!=StelApp::getInstance().getCore()->getCurrentLocation().planetName)
 				{
@@ -1277,7 +1282,6 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 		{
 			close();
 			ui->lineEditSearchSkyObject->clear();
-			searchListModel->clearValues();
 			// Can't point to home planet
 			if (newSelected[0]->getEnglishName()!=StelApp::getInstance().getCore()->getCurrentLocation().planetName)
 			{
@@ -1295,8 +1299,7 @@ void SearchDialog::gotoObject(const QString &nameI18n)
 
 void SearchDialog::gotoObject(const QModelIndex &modelIndex)
 {
-	updateRecentSearchList(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
-	gotoObject(proxyModel->data(modelIndex, Qt::DisplayRole).toString());
+	gotoObject(modelIndex.model()->data(modelIndex, Qt::DisplayRole).toString());
 }
 
 void SearchDialog::searchListClear()
