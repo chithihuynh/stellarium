@@ -150,7 +150,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>3</number>
+      <number>4</number>
      </property>
      <widget class="QWidget" name="objectTab">
       <attribute name="title">
@@ -1186,36 +1186,6 @@
               </property>
               <property name="value">
                <number>20</number>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QDialogButtonBox" name="recentSearchSizeButtonBox">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="font">
-               <font>
-                <family>Noto Sans</family>
-               </font>
-              </property>
-              <property name="layoutDirection">
-               <enum>Qt::RightToLeft</enum>
-              </property>
-              <property name="autoFillBackground">
-               <bool>false</bool>
-              </property>
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="standardButtons">
-               <set>QDialogButtonBox::Apply|QDialogButtonBox::Reset</set>
-              </property>
-              <property name="centerButtons">
-               <bool>false</bool>
               </property>
              </widget>
             </item>

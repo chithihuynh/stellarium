@@ -491,31 +491,13 @@ void SearchDialog::createDialogContent()
 	resetSearchResultDisplay(recentMatches, recentMatches);
 	setPushButtonGotoSearch();
 
-	connect(ui->recentSearchSizeSpinBox, SIGNAL(valueChanged(int)), this, SLOT(recentSearchSizeChanged()));
-	connect(ui->recentSearchSizeButtonBox, SIGNAL(accepted()), this, SLOT(recentSearchSizeApply()));
-	connect(ui->recentSearchSizeButtonBox, SIGNAL(rejected()), this, SLOT(recentSearchSizeReset()));
+	connect(ui->recentSearchSizeSpinBox, SIGNAL(editingFinished()), this, SLOT(recentSearchSizeEditingFinished()));
 
 	QString toolTipComment = QString("Default:%1 | Range: %2 - %3")
 			.arg(defaultMaxSize)
 			.arg(ui->recentSearchSizeSpinBox->minimum())
 			.arg( ui->recentSearchSizeSpinBox->maximum());
 	ui->recentSearchSizeSpinBox->setToolTip(toolTipComment);
-}
-
-void SearchDialog::recentSearchSizeChanged()
-{
-	// Font color change if changed value was not confirmed/rejected
-	if(ui->recentSearchSizeSpinBox->value() != recentObjectSearchesData.maxSize)
-	{
-		ui->recentSearchSizeSpinBox->setStyleSheet("color:rgb(170, 0, 0);"
-							   "selection-background-color:rgb(170, 0, 0);"
-							   "selection-color:rgb(255, 255, 255);");
-	}
-	else
-	{
-		// Revert to normal text if font was changed before
-		ui->recentSearchSizeSpinBox->setStyleSheet("color: rgb(31, 31, 31);");
-	}
 }
 
 void SearchDialog::changeTab(int index)
@@ -602,18 +584,17 @@ void SearchDialog::setSimbadGetsDims(bool b)
 	emit simbadGetsDimsChanged(b);
 }
 
-void SearchDialog::recentSearchSizeApply() // TODO_CH: ENTER = OK
+void SearchDialog::recentSearchSizeEditingFinished()
 {
 	// Update max size in dialog and user data
 	int maxSize = ui->recentSearchSizeSpinBox->value();
 	setRecentSearchSize(maxSize);
 	maxSize = recentObjectSearchesData.maxSize; // Might not be the same
 
-	// Return font to normal
-	ui->recentSearchSizeSpinBox->setStyleSheet("background-color:gray");
-	ui->recentSearchSizeSpinBox->show();
+	// Save maxSize to user's data
+	saveRecentSearches();
 
-	// Get maches
+	// Get matches
 	QStringList allMatches;
 	QStringList recentMatches;
 	QStringList matches;
@@ -638,16 +619,6 @@ void SearchDialog::recentSearchSizeApply() // TODO_CH: ENTER = OK
 	adjustMatchesResult(allMatches, recentMatches, matches, maxNbItem);
 	resetSearchResultDisplay(allMatches, recentMatches);
 	setPushButtonGotoSearch();
-}
-
-void SearchDialog::recentSearchSizeReset()// TODO_CH: Esc = Cancel
-{
-	// Reset to previous value
-	ui->recentSearchSizeSpinBox->setValue(recentObjectSearchesData.maxSize);
-
-	// Return font to normal
-	ui->recentSearchSizeSpinBox->setStyleSheet("background-color:gray;");
-	ui->recentSearchSizeSpinBox->show();
 }
 
 void SearchDialog::enableStartOfWordsAutofill(bool enable)

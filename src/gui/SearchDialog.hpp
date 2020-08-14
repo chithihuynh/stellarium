@@ -246,13 +246,8 @@ private slots:
 	void setSimbadGetsTypes(bool b);
 	void setSimbadGetsDims(bool b);
 
-	//! Change font until change has been accepted or rejected to not mislead
-	//! user on what the max size is currently set to
-	void recentSearchSizeChanged();
 	//! Update recent list's max size
-	void recentSearchSizeApply();
-	//! Restore previous max size
-	void recentSearchSizeReset();
+	void recentSearchSizeEditingFinished();
 
 private:
 	class SearchDialogStaticData
